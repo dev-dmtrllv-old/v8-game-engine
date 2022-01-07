@@ -11,3 +11,9 @@ Features:
 - Move Parallel computations to Compute Shaders (for example particle systems, liquid systems)
 - Custom Log system
 - An editor in which the scenes can be created. Scripting is still needed for custom logic (components).
+
+Todo:
+- Come up with a good working parallel ECS architecture
+	- How should all the components (data) be packed?
+	- What is the order the systems should run in?
+	- How should frames simultaneous be handled? (Copy of the game state...?)
