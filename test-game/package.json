@@ -1,0 +1,7 @@
+{
+	"name": "test-game",
+	"version": "0.1.0",
+	"scripts": {
+		"watch": "tsc --watch"
+	}
+}

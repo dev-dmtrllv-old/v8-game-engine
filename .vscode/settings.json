@@ -1,0 +1,9 @@
+{
+	"files.associations": {
+		"bochsrc": "plaintext",
+		"*.ld": "linkerscript",
+		"*.tcc": "cpp",
+		"cstdlib": "cpp",
+		"mutex": "cpp"
+	}
+}
