@@ -103,27 +103,10 @@ namespace NovaEngine
 			engine->gameWindow.show();
 		}
 
-		struct Test : public ScriptManager::IClassData
+		SCRIPT_METHOD(onSceneSpawn)
 		{
-		public:
-			Test(CallbackArgs args) : IClassData(args)
-			{
-				if (args.Length() >= 1 && args[0]->IsString())
-				{
-					txt = *v8::String::Utf8Value(args[0]);
-					printf(txt.c_str());
-					printf("\n");
-				}
-			}
-
-			~Test()
-			{
-				printf(txt.c_str());
-				printf(" deleted!\n");
-			}
-
-			std::string txt;
-		};
+			Logger::get()->info("SPAWN GAME OBJECT!!!!!!!!!!!!!!!!!!!!!!");
+		}
 
 		static void globalInitializer(ScriptManager* manager, const v8::Local<v8::Object>& global)
 		{
@@ -142,10 +125,17 @@ namespace NovaEngine
 
 			global->Set(ctx, manager->createString("Engine"), engineObj);
 
-			v8::Local<v8::FunctionTemplate> sceneFuncTemplate = manager->createClass<Test>(isolate, "Scene");
-			sceneFuncTemplate->PrototypeTemplate()->Set(isolate, "init", v8::FunctionTemplate::New(isolate, emptyFunction));
-			sceneFuncTemplate->PrototypeTemplate()->Set(isolate, "start", v8::FunctionTemplate::New(isolate, emptyFunction));
-			sceneFuncTemplate->PrototypeTemplate()->Set(isolate, "stop", v8::FunctionTemplate::New(isolate, emptyFunction));
+			v8::Local<v8::FunctionTemplate> sceneFuncTemplate = manager->createClass(isolate, "Scene");
+			
+			auto setSceneFunc = [&](const char* name, void(*func)(CallbackArgs args))
+			{
+				sceneFuncTemplate->PrototypeTemplate()->Set(isolate, name, v8::FunctionTemplate::New(isolate, func));
+			};
+
+			setSceneFunc("load", emptyFunction);
+			setSceneFunc("start", emptyFunction);
+			setSceneFunc("stop", emptyFunction);
+			setSceneFunc("spawn", onSceneSpawn);
 
 			global->Set(ctx, manager->createString("Scene"), sceneFuncTemplate->GetFunction());
 		};

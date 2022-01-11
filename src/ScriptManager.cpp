@@ -347,4 +347,32 @@ namespace NovaEngine
 			puts("}");
 		}
 	}
+
+	v8::Local<v8::FunctionTemplate> ScriptManager::createClass(v8::Isolate* isolate, const char* className, bool abstract)
+	{
+		v8::Local<v8::FunctionTemplate> funcTemp = v8::FunctionTemplate::New(isolate);
+		if (abstract)
+		{
+			funcTemp->SetCallHandler([](const v8::FunctionCallbackInfo<v8::Value>& args) {
+				v8::Isolate* isolate = args.GetIsolate();
+				if (!args.IsConstructCall())
+					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
+				else
+					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot construct an abstract class!"));
+			});
+		}
+		else
+		{
+			funcTemp->SetCallHandler([](const v8::FunctionCallbackInfo<v8::Value>& args) {
+				v8::Isolate* isolate = args.GetIsolate();
+				if (!args.IsConstructCall())
+					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
+			});
+		}
+
+		if (className != nullptr)
+			funcTemp->SetClassName(v8::String::NewFromUtf8(isolate, className));
+
+		return funcTemp;
+	}
 };

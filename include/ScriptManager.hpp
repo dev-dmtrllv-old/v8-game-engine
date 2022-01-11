@@ -2,6 +2,7 @@
 
 #include "framework.hpp"
 #include "SubSystem.hpp"
+#include "Logger.hpp"
 
 #define SCRIPT_METHOD(name) static void name(const v8::FunctionCallbackInfo<v8::Value>& args)
 
@@ -46,70 +47,7 @@ namespace NovaEngine
 			v8::Local<v8::Context>& context;
 		};
 
-		class IClassData
-		{
-			public:
-				IClassData() = delete;
-				IClassData(const v8::FunctionCallbackInfo<v8::Value>& args) {}
-				virtual ~IClassData() {};
-		};
-
-		template<typename Data>
-		class ClassDataWrapper
-		{
-		private:
-			v8::Persistent<v8::Object> obj_;
-			Data* data_;
-
-		public:
-			ClassDataWrapper(v8::Isolate* isolate, v8::Local<v8::Object> obj, Data* data) : obj_(), data_(data)
-			{
-				obj->SetInternalField(0, v8::External::New(isolate, this));
-				obj_.Reset(isolate, obj);
-				obj_.SetWeak(this, [](const v8::WeakCallbackInfo<ClassDataWrapper<Data>>& data) {
-					ClassDataWrapper<Data>* ctx = data.GetParameter();
-					if (!ctx->obj().IsEmpty())
-					{
-						ctx->obj().ClearWeak();
-						ctx->obj().Reset();
-					}
-					ctx->deleteData();
-				}, v8::WeakCallbackType::kParameter);
-			}
-
-			v8::Persistent<v8::Object>& obj() { return obj_; }
-			Data* data() { return data_; }
-
-			void deleteData()
-			{
-				if (data_ != nullptr)
-				{
-					delete data_;
-					data_ = nullptr;
-				}
-			}
-
-			bool isDeleted() { return data_ == nullptr; }
-		};
-
-		template<typename T, typename std::enable_if<std::is_base_of<IClassData, T>::value>::type* = nullptr>
-		v8::Local<v8::FunctionTemplate> createClass(v8::Isolate* isolate, const char* className)
-		{
-			v8::Local<v8::FunctionTemplate> funcTemp = v8::FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& args) {
-				v8::Isolate* isolate = args.GetIsolate();
-				if (!args.IsConstructCall())
-				{
-					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
-				}
-				else
-				{
-					ClassDataWrapper<T>* t = new ClassDataWrapper<T>(isolate, args.This(), new T(args));
-				}
-			});
-			funcTemp->SetClassName(v8::String::NewFromUtf8(isolate, className));
-			funcTemp->InstanceTemplate()->SetInternalFieldCount(1);
-			return funcTemp;
-		}
+		typedef const char* Exception;
 
 		template<typename Callback>
 		static void iterateObjectKeys(v8::Local<v8::Object> obj, Callback callback)
@@ -174,6 +112,7 @@ namespace NovaEngine
 		v8::Local<v8::Array> createArray();
 		v8::Local<v8::Object> createObject();
 		v8::Local<v8::Function> createFunction(v8::FunctionCallback);
+		v8::Local<v8::FunctionTemplate> createClass(v8::Isolate* isolate, const char* className = nullptr, bool abstract = false);
 
 		v8::Isolate* isolate();
 		v8::Local<v8::Context> context();
@@ -190,13 +129,19 @@ namespace NovaEngine
 			v8::Local<v8::Context> context = v8::Local<v8::Context>::New(isolate_, context_);
 			v8::Context::Scope contextScope(context);
 
+			v8::TryCatch tryCatch = v8::TryCatch(isolate_);
+
 			RunInfo runInfo(this, isolate_, context);
+
 			callback(runInfo);
-		}
 
-		void createClass()
-		{
-
+			if(tryCatch.HasCaught())
+			{
+				v8::Local<v8::String> exceptionStr = tryCatch.Exception()->ToString(isolate_);
+				v8::String::Utf8Value val = v8::String::Utf8Value(isolate_, exceptionStr);
+				Logger::get()->error(*val);
+				throw Exception(*val);
+			}
 		}
 
 	private:

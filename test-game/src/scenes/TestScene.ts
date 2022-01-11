@@ -1,14 +1,8 @@
 export class TestScene extends Scene
 {
-	public constructor()
-	{
-		super();
-		Engine.log("Test scene initialized!");
-	}
-
 	protected load(): void
 	{
-		Engine.log("Test Scene load function called!");
+		this.spawn("hyaaaaa!");
 	}
 
 	protected start(): void

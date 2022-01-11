@@ -54,6 +54,7 @@ namespace NovaEngine
 			ERROR,
 		};
 
+	private:
 		void logRest(const char* str);
 		void logRest(std::string& str);
 
