@@ -28,7 +28,7 @@ namespace NovaEngine::JobSystem
 		template<typename T>
 		JobInfo(JobFunction function, T arg) : function(function), arg(reinterpret_cast<void*>(arg)) {}
 
-		JobInfo(JobFunction function = nullptr, void* arg = nullptr) : function(function), arg(arg) {}
+		JobInfo(JobFunction function, void* arg = nullptr) : function(function), arg(arg) {}
 	};
 
 	class JobScheduler : public SubSystem<>
@@ -36,23 +36,31 @@ namespace NovaEngine::JobSystem
 	private:
 		size_t maxJobs_;
 		Queue<JobHandle> readyQueue_;
+		Queue<JobHandle> mainThreadQueue_;
 		List<JobHandle> waitList_;
+		List<JobHandle> mainThreadWaitList_;
 		std::mutex jobYieldMutex_;
+		std::mutex mainThreadJobYieldMutex_;
 
 		std::vector<std::thread> threads_;
 		std::thread::id mainThreadID_;
 		std::atomic<int> threadsRunning_;
 		size_t executionThreads_;
 
+		bool isRunning_;
+
 		ENGINE_SUB_SYSTEM_CTOR(JobScheduler),
 			maxJobs_(DefaultConfig::JobSystem::maxJobs),
 			readyQueue_(),
+			mainThreadQueue_(),
 			waitList_(),
+			mainThreadWaitList_(),
 			jobYieldMutex_(),
 			threads_(),
 			mainThreadID_(std::this_thread::get_id()),
 			threadsRunning_(),
-			executionThreads_(1)
+			executionThreads_(1),
+			isRunning_(false)
 		{
 			threadsRunning_.store(0);
 		}
@@ -61,15 +69,19 @@ namespace NovaEngine::JobSystem
 		bool onInitialize();
 		bool onTerminate();
 		bool runNextJob(JobHandle* handleOut);
+		bool runNextMainThreadJob(JobHandle* handleOut);
 		void threadEntry(size_t threadID);
 		bool handleJobYield(JobHandle* handle);
+		bool handleMainThreadJobYield(JobHandle* handle);
 
 	public:
-		Counter* runJobs(JobInfo* jobs, size_t jobsCount);
-		Counter* runJob(JobInfo jobs);
-		Counter* runJob(JobFunction func);
+		Counter* runJobs(JobInfo* jobs, size_t jobsCount, bool mainThreadOnly = false);
+		Counter* runJob(JobInfo jobs, bool mainThreadOnly = false);
+		Counter* runJob(JobFunction func, bool mainThreadOnly = false);
 
 		void joinThreads();
+
+		const bool isRunning();
 
 		void execNext()
 		{
@@ -86,25 +98,38 @@ namespace NovaEngine::JobSystem
 			if (mainThreadID_ != std::this_thread::get_id())
 				throw std::runtime_error("Cannot call JobScheduler::exec() from another thread than the main thread!");
 
+			if(isRunning_)
+				throw std::runtime_error("JobScheduler::exec() is already running!");
+
+			isRunning_ = true;
+
 			bool didStartThreads = threadsRunning_.load() == 0;
 			bool didInitializeThreads = threads_.size() == 0;
-			
+
 			if (didInitializeThreads)
 				initThreads();
 
 			if (didStartThreads)
 				runThreads();
 
+
 			JobHandle jobHandle;
 
 			while (shouldLoop())
-				if (runNextJob(&jobHandle))
+			{
+				if(runNextMainThreadJob(&jobHandle))
 					handleJobYield(&jobHandle);
-			
+				
+				if (shouldLoop() && runNextJob(&jobHandle))
+					handleJobYield(&jobHandle);
+			}
+
+			isRunning_ = true;
+
 			if (didStartThreads)
 				stopThreads();
 
-			if(didInitializeThreads)
+			if (didInitializeThreads)
 				joinThreads();
 		}
 

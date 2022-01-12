@@ -4,6 +4,7 @@
 		"esModuleInterop": true,
 		"strictFunctionTypes": true,
 		"strictNullChecks": true,
+		"baseUrl": "./src",
 		"outDir": "../out/assets/scripts",
 		"lib": [
 			"ES6"
@@ -11,6 +12,11 @@
 		"typeRoots": [
 			"./lib"
 		],
+		"paths": {
+			"scenes/*": [
+				"scenes/*"
+			]
+		},
 		"noImplicitUseStrict": true,
 		"alwaysStrict": false,
 		"types": [],

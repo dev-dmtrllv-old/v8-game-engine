@@ -7,13 +7,15 @@ namespace NovaEngine
 	STATIC_JOB(WindowManager, pollEvents)
 	{
 		glfwPollEvents();
-		scheduler->runJob(pollEvents);
+		scheduler->runJob(pollEvents, true);
 		JOB_RETURN;
 	}
 
 	void WindowManager::onWindowClose(GLFWwindow* window)
 	{
+		Logger::get()->info("Destroy window!");
 		reinterpret_cast<GameWindow*>(glfwGetWindowUserPointer(window))->destroy();
+		Logger::get()->info("window Destroyed !");
 	}
 
 	bool WindowManager::onInitialize()

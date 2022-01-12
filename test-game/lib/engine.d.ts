@@ -47,9 +47,10 @@ declare namespace Engine
 	const onLoad: <T extends EngineConfiguration>(callback: OnLoadCallback<T>) => void;
 	const log: (...args: any[]) => void;
 	const start: (sceneName: string) => void;
+	const getActiveScene: () => Scene | null;
 }
 
-type OnLoadCallback<T extends EngineConfiguration> = (configure: EngineConfigureFunction<T>) => any;
+type OnLoadCallback<T extends EngineConfiguration> = (configure: EngineConfigureFunction<T>) => void;
 
 type EngineConfigureFunction<T extends EngineConfiguration> = (config: T) => Promise<void>;
 

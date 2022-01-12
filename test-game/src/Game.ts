@@ -1,4 +1,4 @@
-import { TestScene } from "./scenes/TestScene";
+import { TestScene } from "scenes/TestScene";
 
 Engine.onLoad(async (configure) => 
 {

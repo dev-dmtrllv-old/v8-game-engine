@@ -3,17 +3,14 @@
 
 namespace NovaEngine
 {
-	std::vector<ScriptManager*> ScriptManager::instances_;
 	std::unique_ptr<v8::Platform> ScriptManager::platform_;
 
 	bool ScriptManager::onInitialize(ScriptManagerGlobalInitializer globalInitializer)
 	{
-		if (instances_.size() == 0)
-		{
-			platform_ = v8::platform::NewDefaultPlatform();
-			v8::V8::InitializePlatform(platform_.get());
-			v8::V8::Initialize();
-		}
+
+		platform_ = v8::platform::NewDefaultPlatform();
+		v8::V8::InitializePlatform(platform_.get());
+		v8::V8::Initialize();
 
 		{
 			createParams_.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
@@ -29,14 +26,10 @@ namespace NovaEngine
 		}
 
 		run([&](const RunInfo& info) {
-			uint32_t index = static_cast<uint32_t>(std::distance(instances_.begin(), std::find(instances_.begin(), instances_.end(), this)));
-			scriptManagerReference_.Reset(isolate_, v8::Number::New(isolate_, index));
 			v8::Local<v8::Object> global = info.context->Global();
 			globalInitializer(this, global);
 			global->Set(info.context, createString("require"), createFunction(onRequire));
 		});
-
-		instances_.push_back(this);
 
 		return true;
 	}
@@ -46,8 +39,6 @@ namespace NovaEngine
 		for (std::pair<const std::string, v8::Global<v8::Object>>& mod : modules_)
 			mod.second.Reset();
 
-		instances_.erase(std::find(instances_.begin(), instances_.end(), this));
-
 		context_.Reset();
 		scriptManagerReference_.Reset();
 
@@ -55,12 +46,9 @@ namespace NovaEngine
 
 		delete createParams_.array_buffer_allocator;
 
-		if (instances_.size() == 0)
-		{
-			v8::V8::Dispose();
-			v8::V8::ShutdownPlatform();
-			Logger::get()->info("V8 Disposed!");
-		}
+		v8::V8::Dispose();
+		v8::V8::ShutdownPlatform();
+		Logger::get()->info("V8 Disposed!");
 
 		return true;
 	}
@@ -70,31 +58,6 @@ namespace NovaEngine
 	v8::Local<v8::String> ScriptManager::createString(const char* string)
 	{
 		return v8::String::NewFromUtf8(isolate_, string, v8::NewStringType::kNormal).ToLocalChecked();
-	}
-
-	v8::Local<v8::Number> ScriptManager::createNumber(uint32_t num)
-	{
-		return v8::Number::New(isolate_, num);
-	}
-
-	v8::Local<v8::Number> ScriptManager::createNumber(int32_t num)
-	{
-		return v8::Number::New(isolate_, num);
-	}
-
-	v8::Local<v8::Boolean> ScriptManager::createBool(bool boolean)
-	{
-		return v8::Boolean::New(isolate_, boolean);
-	}
-
-	v8::Local<v8::Array> ScriptManager::createArray()
-	{
-		return v8::Array::New(isolate_);
-	}
-
-	v8::Local<v8::Object> ScriptManager::createObject()
-	{
-		return v8::Object::New(isolate_);
 	}
 
 	v8::Local<v8::Function> ScriptManager::createFunction(v8::FunctionCallback cb)
@@ -125,16 +88,11 @@ namespace NovaEngine
 		return relativePath;
 	}
 
-	ScriptManager* ScriptManager::callbackDataToScriptManager(const v8::Local<v8::Context>& ctx, const v8::Local<v8::Value>& data)
-	{
-		return instances_.at(data.As<v8::Number>()->Uint32Value(ctx).ToChecked());
-	}
-
 	void ScriptManager::onRequire(const v8::FunctionCallbackInfo<v8::Value>& args)
 	{
 		v8::Isolate* isolate = args.GetIsolate();
 		v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
-		callbackDataToScriptManager(ctx, args.Data())->handleRequire(args);
+		fetchEngineFromArgs(args)->scriptManager.handleRequire(args);
 	}
 
 	void ScriptManager::handleRequire(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -346,33 +304,5 @@ namespace NovaEngine
 		{
 			puts("}");
 		}
-	}
-
-	v8::Local<v8::FunctionTemplate> ScriptManager::createClass(v8::Isolate* isolate, const char* className, bool abstract)
-	{
-		v8::Local<v8::FunctionTemplate> funcTemp = v8::FunctionTemplate::New(isolate);
-		if (abstract)
-		{
-			funcTemp->SetCallHandler([](const v8::FunctionCallbackInfo<v8::Value>& args) {
-				v8::Isolate* isolate = args.GetIsolate();
-				if (!args.IsConstructCall())
-					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
-				else
-					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot construct an abstract class!"));
-			});
-		}
-		else
-		{
-			funcTemp->SetCallHandler([](const v8::FunctionCallbackInfo<v8::Value>& args) {
-				v8::Isolate* isolate = args.GetIsolate();
-				if (!args.IsConstructCall())
-					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
-			});
-		}
-
-		if (className != nullptr)
-			funcTemp->SetClassName(v8::String::NewFromUtf8(isolate, className));
-
-		return funcTemp;
 	}
 };

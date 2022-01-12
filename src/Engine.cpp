@@ -108,36 +108,35 @@ namespace NovaEngine
 			Logger::get()->info("SPAWN GAME OBJECT!!!!!!!!!!!!!!!!!!!!!!");
 		}
 
+		SCRIPT_METHOD(onGetActiveScene)
+		{
+			Logger::get()->info("GET ACTIVE SCENE!!!!!!!!!!!!!!!!!!!!!!");
+			args.GetReturnValue().SetNull();
+		}
+
 		static void globalInitializer(ScriptManager* manager, const v8::Local<v8::Object>& global)
 		{
 			v8::Isolate* isolate = manager->isolate();
 			v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
-			v8::Local<v8::Object> engineObj = v8::Object::New(isolate);
-			engineObj->Set(ctx, manager->createString("onLoad"), manager->createFunction(onEngineLoad));
-			engineObj->Set(ctx, manager->createString("log"), manager->createFunction(log));
-			engineObj->Set(ctx, manager->createString("start"), manager->createFunction(onEngineStart));
+			auto globalObject = ScriptManager::ObjectBuilder(global, isolate, ctx);
 
-			v8::Local<v8::Object> windowObj = v8::Object::New(isolate);
-			windowObj->Set(ctx, manager->createString("show"), manager->createFunction(onShowWindow));
+			auto engineObject = globalObject.newObject("Engine");
+			engineObject.set("onLoad", onEngineLoad);
+			engineObject.set("start", onEngineStart);
+			engineObject.set("log", log);
+			engineObject.set("getActiveScene", onGetActiveScene);
 
-			engineObj->Set(ctx, manager->createString("window"), windowObj);
+			auto windowObj = engineObject.newObject("window");
+			windowObj.set("show", onShowWindow);
 
-			global->Set(ctx, manager->createString("Engine"), engineObj);
+			ScriptManager::ClassBuilder sceneClass = ScriptManager::ClassBuilder(isolate, "Scene");
+			sceneClass.set("load", emptyFunction);
+			sceneClass.set("start", emptyFunction);
+			sceneClass.set("stop", emptyFunction);
+			sceneClass.set("spawn", onSceneSpawn);
 
-			v8::Local<v8::FunctionTemplate> sceneFuncTemplate = manager->createClass(isolate, "Scene");
-			
-			auto setSceneFunc = [&](const char* name, void(*func)(CallbackArgs args))
-			{
-				sceneFuncTemplate->PrototypeTemplate()->Set(isolate, name, v8::FunctionTemplate::New(isolate, func));
-			};
-
-			setSceneFunc("load", emptyFunction);
-			setSceneFunc("start", emptyFunction);
-			setSceneFunc("stop", emptyFunction);
-			setSceneFunc("spawn", onSceneSpawn);
-
-			global->Set(ctx, manager->createString("Scene"), sceneFuncTemplate->GetFunction());
+			globalObject.set("Scene", sceneClass.build());
 		};
 	};
 #pragma endregion
@@ -276,7 +275,7 @@ namespace NovaEngine
 	{
 		if (!isRunning_)
 		{
-			Logger::get()->info("starting engine with scene ", startSceneName,"...");
+			Logger::get()->info("starting engine with scene ", startSceneName, "...");
 
 			isRunning_ = true;
 
@@ -286,7 +285,7 @@ namespace NovaEngine
 				{ WindowManager::pollEvents }
 			};
 
-			jobScheduler.runJobs(jobs, 1);
+			jobScheduler.runJobs(jobs, 1, true);
 
 			jobScheduler.exec([&] { return !windowManager.allWindowsClosed(); });
 

@@ -14,28 +14,6 @@ namespace NovaEngine
 
 	typedef void(*ScriptManagerGlobalInitializer)(ScriptManager* manager, const v8::Local<v8::Object>&);
 
-	template<typename T>
-	class PrototypeBuilder
-	{
-	private:
-		v8::Isolate* isolate;
-		v8::Local<v8::FunctionTemplate> classTemplate;
-		v8::Local<v8::ObjectTemplate> prototype;
-	public:
-		PrototypeBuilder(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate> classTemplate) : isolate(isolate), classTemplate(classTemplate), prototype(classTemplate->PrototypeTemplate()) {}
-
-		template<typename FunctionCallback>
-		void SetFunction(const char* name, FunctionCallback callback)
-		{
-			prototype->Set(v8::String::NewFromUtf8(isolate, name), v8::FunctionTemplate::New(isolate, callback)->GetFunction());
-		}
-
-		v8::Persistent<v8::Function> build()
-		{
-			return v8::Persistent<v8::Function>(isolate, classTemplate->GetFunction());
-		}
-	};
-
 	class ScriptManager : public SubSystem<ScriptManagerGlobalInitializer>
 	{
 	public:
@@ -83,7 +61,6 @@ namespace NovaEngine
 		{}
 
 		static void onRequire(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static ScriptManager* callbackDataToScriptManager(const v8::Local<v8::Context>& ctx, const v8::Local<v8::Value>&);
 
 		static std::unique_ptr<v8::Platform> platform_;
 
@@ -97,8 +74,6 @@ namespace NovaEngine
 		std::string getRelativePath(const std::string& str);
 
 	protected:
-		static std::vector<ScriptManager*> instances_;
-
 		bool runScript(v8::Local<v8::Context> context, const char* scriptString);
 
 		bool onInitialize(ScriptManagerGlobalInitializer globalInitializer);
@@ -106,13 +81,7 @@ namespace NovaEngine
 
 	public:
 		v8::Local<v8::String> createString(const char* string);
-		v8::Local<v8::Number> createNumber(uint32_t num);
-		v8::Local<v8::Number> createNumber(int32_t num);
-		v8::Local<v8::Boolean> createBool(bool boolean);
-		v8::Local<v8::Array> createArray();
-		v8::Local<v8::Object> createObject();
 		v8::Local<v8::Function> createFunction(v8::FunctionCallback);
-		v8::Local<v8::FunctionTemplate> createClass(v8::Isolate* isolate, const char* className = nullptr, bool abstract = false);
 
 		v8::Isolate* isolate();
 		v8::Local<v8::Context> context();
@@ -135,7 +104,7 @@ namespace NovaEngine
 
 			callback(runInfo);
 
-			if(tryCatch.HasCaught())
+			if (tryCatch.HasCaught())
 			{
 				v8::Local<v8::String> exceptionStr = tryCatch.Exception()->ToString(isolate_);
 				v8::String::Utf8Value val = v8::String::Utf8Value(isolate_, exceptionStr);
@@ -146,5 +115,152 @@ namespace NovaEngine
 
 	private:
 		void handleRequire(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+	public:
+		class ObjectBuilder
+		{
+		private:
+			v8::Local<v8::Object> boundObject;
+			v8::Isolate* isolate;
+			v8::Local<v8::Context> ctx;
+
+			inline v8::Local<v8::String> newString(const char* str)
+			{
+				return v8::String::NewFromUtf8(isolate, str, v8::NewStringType::kNormal).ToLocalChecked();
+			}
+
+		public:
+			ObjectBuilder(v8::Local<v8::Object> boundObject, v8::Isolate* isolate, v8::Local<v8::Context> ctx) :
+				boundObject(boundObject),
+				isolate(isolate),
+				ctx(ctx)
+			{}
+
+			ObjectBuilder& set(const char* name, int num)
+			{
+				boundObject->Set(ctx, newString(name), v8::Number::New(isolate, num));
+				return *this;
+			}
+
+			ObjectBuilder& set(const char* name, unsigned int num)
+			{
+				boundObject->Set(ctx, newString(name), v8::Number::New(isolate, num));
+				return *this;
+			}
+
+			ObjectBuilder& set(const char* name, float num)
+			{
+				boundObject->Set(ctx, newString(name), v8::Number::New(isolate, num));
+				return *this;
+			}
+
+			ObjectBuilder& set(const char* name, double num)
+			{
+				boundObject->Set(ctx, newString(name), v8::Number::New(isolate, num));
+				return *this;
+			}
+
+			ObjectBuilder& set(const char* name, const char* string)
+			{
+				boundObject->Set(ctx, newString(name), newString(string));
+				return *this;
+			}
+
+			ObjectBuilder& set(const char* name, bool boolean)
+			{
+				boundObject->Set(ctx, newString(name), v8::Boolean::New(isolate, boolean));
+				return *this;
+			}
+
+			ObjectBuilder& set(const char* name, v8::FunctionCallback func)
+			{
+				boundObject->Set(ctx, newString(name), v8::Function::New(isolate, func));
+				return *this;
+			}
+
+			template <typename T>
+			ObjectBuilder& set(const char* name, T param)
+			{
+				boundObject->Set(ctx, newString(name), param);
+				return *this;
+			}
+
+			ObjectBuilder newObject(const char* name)
+			{
+				v8::Local<v8::Object> o = v8::Object::New(isolate);
+				boundObject->Set(ctx, newString(name), o);
+				return ObjectBuilder(o, isolate, ctx);
+			}
+		};
+
+		class ClassBuilder
+		{
+		private:
+			v8::Isolate* isolate;
+			v8::Local<v8::FunctionTemplate> funcTemp;
+			v8::Local<v8::ObjectTemplate> protoTemp;
+
+		public:
+			ClassBuilder(v8::Isolate* isolate, const char* name) : isolate(isolate), funcTemp(v8::FunctionTemplate::New(isolate))
+			{
+				funcTemp->SetCallHandler([](const v8::FunctionCallbackInfo<v8::Value>& args) {
+					v8::Isolate* isolate = args.GetIsolate();
+					if (!args.IsConstructCall())
+						isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
+				});
+
+				if (name != nullptr)
+					funcTemp->SetClassName(v8::String::NewFromUtf8(isolate, name));
+
+				protoTemp = funcTemp->PrototypeTemplate();
+			}
+
+			ClassBuilder& set(const char* name, int num)
+			{
+				protoTemp->Set(isolate, name, v8::Number::New(isolate, num));
+				return *this;
+			}
+
+			ClassBuilder& set(const char* name, unsigned int num)
+			{
+				protoTemp->Set(isolate, name, v8::Number::New(isolate, num));
+				return *this;
+			}
+
+			ClassBuilder& set(const char* name, float num)
+			{
+				protoTemp->Set(isolate, name, v8::Number::New(isolate, num));
+				return *this;
+			}
+
+			ClassBuilder& set(const char* name, double num)
+			{
+				protoTemp->Set(isolate, name, v8::Number::New(isolate, num));
+				return *this;
+			}
+
+			ClassBuilder& set(const char* name, const char* string)
+			{
+				protoTemp->Set(isolate, name, v8::String::NewFromUtf8(isolate, string, v8::NewStringType::kNormal).ToLocalChecked());
+				return *this;
+			}
+
+			ClassBuilder& set(const char* name, bool boolean)
+			{
+				protoTemp->Set(isolate, name, v8::Boolean::New(isolate, boolean));
+				return *this;
+			}
+
+			ClassBuilder& set(const char* name, v8::FunctionCallback func)
+			{
+				protoTemp->Set(isolate, name, v8::FunctionTemplate::New(isolate, func));
+				return *this;
+			}
+
+			v8::Local<v8::Function> build()
+			{
+				return funcTemp->GetFunction();
+			}
+		};
 	};
 }
