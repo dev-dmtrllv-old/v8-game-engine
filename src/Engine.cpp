@@ -3,6 +3,36 @@
 
 #define CHECK_REJECT(subSystem, rejector, msg) if(!subSystem) { rejector(msg); Logger::get()->error(#subSystem ":" #rejector " -> " msg); return false; }
 
+#ifdef DEBUG
+using Hash = const char*;
+#else
+using Hash = size_t;
+#endif
+
+struct Hasher
+{
+private:
+	constexpr static size_t hashString(const char* str)
+	{
+		size_t hash = 5381;
+		int c;
+
+		while ((c = *str++))
+			hash = ((hash << 5) + hash) * 33 + c;
+
+		return hash;
+	}
+
+public:
+#ifdef DEBUG
+	constexpr static Hash hash(const char* str) { return str; }
+	constexpr static bool check(Hash& a, const char* b) { return hash(a) == hash(b); }
+#else
+	constexpr static Hash hash(const char* str) { return hashString(str); }
+	constexpr static bool check(Hash& hashStr, const char* str) { return hash(str) == hashStr; }
+#endif
+};
+
 namespace NovaEngine
 {
 #pragma region Scripting Area
@@ -14,22 +44,19 @@ namespace NovaEngine
 
 		SCRIPT_METHOD(onEngineConfigure)
 		{
-			v8::Isolate* isolate_ = args.GetIsolate();
-			v8::HandleScope handle_scope(isolate_);
-			v8::Local<v8::Context> context = isolate_->GetCurrentContext();
-			v8::Context::Scope context_scope(context);
+			v8::Isolate* isolate = args.GetIsolate();
 
 			if (args.Length() < 1)
 			{
-				// printf("Nein Nein Nein!\n");
+
 			}
 			else if (args[0]->IsObject())
 			{
-				v8::Local<v8::Promise::Resolver> resolver = v8::Promise::Resolver::New(isolate_);
+				v8::Local<v8::Promise::Resolver> resolver = v8::Promise::Resolver::New(isolate);
 				v8::Local<v8::Promise> p = resolver->GetPromise();
 				args.GetReturnValue().Set(p);
-				configurePromiseResolver_.Reset(isolate_, resolver);
-				configuredValue_.Reset(isolate_, args[0]->ToObject(isolate_));
+				configurePromiseResolver_.Reset(isolate, resolver);
+				configuredValue_.Reset(isolate, args[0]->ToObject(isolate));
 			}
 		}
 
@@ -252,6 +279,7 @@ namespace NovaEngine
 				}
 			}
 		}
+
 		return executablePath_;
 	}
 
@@ -317,16 +345,16 @@ namespace NovaEngine
 			Logger::get()->info(p.first, " terminated!");
 		}
 
-		// jobScheduler.terminate();
-		// graphicsManager.terminate();
-		// windowManager.terminate();
-		// configManager.terminate();
-		// scriptManager.terminate();
-		// assetManager.terminate();
-
 		Logger::terminate();
 
 		glfwTerminate();
+
+		Hash a = Hasher::hash("123123");
+
+		if (Hasher::check(a, "123123"))
+		{
+			std::cout << "HASH " << a <<  " <-> 123123 MATCHED!" << std::endl;
+		}
 
 		return true;
 	}
