@@ -90,8 +90,6 @@ namespace NovaEngine
 
 	void ScriptManager::onRequire(const v8::FunctionCallbackInfo<v8::Value>& args)
 	{
-		v8::Isolate* isolate = args.GetIsolate();
-		v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 		fetchEngineFromArgs(args)->scriptManager.handleRequire(args);
 	}
 
