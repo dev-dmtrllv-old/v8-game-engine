@@ -30,6 +30,7 @@ namespace NovaEngine
 		void destroy();
 		GLFWwindow* glfwWindow();
 		const char* title();
+		Engine* engine();
 
 	private:
 		Engine* engine_;

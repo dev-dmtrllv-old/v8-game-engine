@@ -13,6 +13,7 @@
 #include "SceneManager.hpp"
 #include "EntityManager.hpp"
 #include "ComponentManager.hpp"
+#include "EventManager.hpp"
 
 namespace NovaEngine
 {
@@ -33,6 +34,7 @@ namespace NovaEngine
 			return instance_;
 		}
 
+		EventManager eventManager;
 		AssetManager assetManager;
 		ScriptManager scriptManager;
 		ConfigManager configManager;
@@ -62,7 +64,6 @@ namespace NovaEngine
 		bool onTerminate();
 
 	private:
-
 		template<typename... Args>
 		bool initSubSystem(const char* name, SubSystem<Args...>* subSystem, Args... args)
 		{

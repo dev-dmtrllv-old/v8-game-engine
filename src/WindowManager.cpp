@@ -13,16 +13,18 @@ namespace NovaEngine
 
 	void WindowManager::onWindowClose(GLFWwindow* window)
 	{
-		Logger::get()->info("Destroy window!");
-		reinterpret_cast<GameWindow*>(glfwGetWindowUserPointer(window))->destroy();
-		Logger::get()->info("window Destroyed !");
+		GameWindow* gameWindow = reinterpret_cast<GameWindow*>(glfwGetWindowUserPointer(window));
+		Engine* engine = gameWindow->engine();
+		gameWindow->destroy();
+		if(engine->windowManager.allWindowsClosed())
+			engine->eventManager.emit(WindowManagerEvents::ALL_WINDOWS_CLOSED, nullptr);
 	}
 
 	bool WindowManager::onInitialize()
 	{
 		Engine* e = engine();
-	
-		if(!e->gameWindow.create(e->configManager.getGameName().c_str(), e->configManager.getWindowConfig()))
+
+		if (!e->gameWindow.create(e->configManager.getGameName().c_str(), e->configManager.getWindowConfig()))
 		{
 			Logger::get()->error("Could not create window!");
 			return false;
@@ -32,7 +34,7 @@ namespace NovaEngine
 
 		return true;
 	}
-	
+
 	bool WindowManager::onTerminate()
 	{
 		return true;
@@ -46,8 +48,8 @@ namespace NovaEngine
 
 	bool WindowManager::allWindowsClosed()
 	{
-		for(auto w : windows_)
-			if(!w->isClosed())
+		for (auto w : windows_)
+			if (!w->isClosed())
 				return false;
 		return true;
 	}

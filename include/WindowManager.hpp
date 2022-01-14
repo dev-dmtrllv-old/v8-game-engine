@@ -3,10 +3,16 @@
 #include "SubSystem.hpp"
 #include "framework.hpp"
 #include "job_system/JobScheduler.hpp"
+#include "Hash.hpp"
 
 namespace NovaEngine
 {
 	class GameWindow;
+
+	enum class WindowManagerEvents : Hash
+	{
+		ALL_WINDOWS_CLOSED = Hasher::hash("ALL_WINDOWS_CLOSED"),
+	};
 
 	class WindowManager : public SubSystem<>
 	{

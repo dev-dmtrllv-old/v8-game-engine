@@ -95,4 +95,9 @@ namespace NovaEngine
 	{
 		return title_.c_str();
 	}
+
+	Engine* GameWindow::engine()
+	{
+		return engine_;
+	}
 };

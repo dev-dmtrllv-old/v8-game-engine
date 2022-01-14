@@ -3,36 +3,6 @@
 
 #define CHECK_REJECT(subSystem, rejector, msg) if(!subSystem) { rejector(msg); Logger::get()->error(#subSystem ":" #rejector " -> " msg); return false; }
 
-#ifdef DEBUG
-using Hash = const char*;
-#else
-using Hash = size_t;
-#endif
-
-struct Hasher
-{
-private:
-	constexpr static size_t hashString(const char* str)
-	{
-		size_t hash = 5381;
-		int c;
-
-		while ((c = *str++))
-			hash = ((hash << 5) + hash) * 33 + c;
-
-		return hash;
-	}
-
-public:
-#ifdef DEBUG
-	constexpr static Hash hash(const char* str) { return str; }
-	constexpr static bool check(Hash& a, const char* b) { return hash(a) == hash(b); }
-#else
-	constexpr static Hash hash(const char* str) { return hashString(str); }
-	constexpr static bool check(Hash& hashStr, const char* str) { return hash(str) == hashStr; }
-#endif
-};
-
 namespace NovaEngine
 {
 #pragma region Scripting Area
@@ -173,6 +143,7 @@ namespace NovaEngine
 	Engine::Engine() : AbstractObject(),
 		subsystemTerminateOrder_(),
 		isRunning_(false),
+		eventManager(this),
 		assetManager(this),
 		scriptManager(this),
 		configManager(this),
@@ -305,8 +276,15 @@ namespace NovaEngine
 		{
 			Logger::get()->info("starting engine with scene ", startSceneName, "...");
 
-			isRunning_ = true;
+			eventManager.on(WindowManagerEvents::ALL_WINDOWS_CLOSED, [](EventManager::EventData& data)
+			{
+				Logger::get()->info("All windows closed event callback!");
+				// isRunning_ = false;
+				data.engine->isRunning_ = false;
+			});
 
+			isRunning_ = true;
+			
 			sceneManager.loadScene(startSceneName);
 
 			JobSystem::JobInfo jobs[1] = {
@@ -315,9 +293,7 @@ namespace NovaEngine
 
 			jobScheduler.runJobs(jobs, 1, true);
 
-			jobScheduler.exec([&] { return !windowManager.allWindowsClosed(); });
-
-			gameWindow.destroy();
+			jobScheduler.exec([&] { return isRunning_; });
 
 			isRunning_ = false;
 		}
