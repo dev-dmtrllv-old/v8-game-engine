@@ -14,9 +14,9 @@ Engine.onLoad(async (configure) =>
 			width: 1920,
 			height: 1080,
 			hidden: true,
-			graphics: {
-				clearColor: [1, 0.2, 0.2, 1]
-			},
+		},
+		graphics: {
+			clearColor: [1, 0.2, 0.2, 1]
 		},
 		jobSystem: {
 			executionThreads: 3,

@@ -92,25 +92,25 @@ namespace NovaEngine
 				gameConfig_.window.fullscreen = Parser::parseBool(windowObj, "fullscreen", DefaultConfig::GameWindow::fullscreen);
 				gameConfig_.window.maximized = Parser::parseBool(windowObj, "maximized", DefaultConfig::GameWindow::maximized);
 				gameConfig_.window.hidden = Parser::parseBool(windowObj, "hidden", DefaultConfig::GameWindow::hidden);
+			}
 
-				if (!Parser::isUndefined(windowObj, "graphics"))
+			if (!Parser::isUndefined(config, "graphics"))
+			{
+				Local<Object> graphicsObj = Parser::parseObj(config, "graphics");
+
+				if (!Parser::isUndefined(graphicsObj, "clearColor"))
 				{
-					Local<Object> graphicsObj = Parser::parseObj(windowObj, "graphics");
-
-					if (!Parser::isUndefined(graphicsObj, "clearColor"))
-					{
-						gameConfig_.window.graphics.clearColor[0] = Parser::getArrayVal(graphicsObj, "clearColor", 0)->NumberValue();
-						gameConfig_.window.graphics.clearColor[1] = Parser::getArrayVal(graphicsObj, "clearColor", 1)->NumberValue();
-						gameConfig_.window.graphics.clearColor[2] = Parser::getArrayVal(graphicsObj, "clearColor", 2)->NumberValue();
-						gameConfig_.window.graphics.clearColor[3] = Parser::getArrayVal(graphicsObj, "clearColor", 3)->NumberValue();
-					}
-					else
-					{
-						gameConfig_.window.graphics.clearColor[0] = 0.0f;
-						gameConfig_.window.graphics.clearColor[1] = 0.0f;
-						gameConfig_.window.graphics.clearColor[2] = 0.0f;
-						gameConfig_.window.graphics.clearColor[3] = 1.0f;
-					}
+					gameConfig_.window.graphics.clearColor[0] = Parser::getArrayVal(graphicsObj, "clearColor", 0)->NumberValue();
+					gameConfig_.window.graphics.clearColor[1] = Parser::getArrayVal(graphicsObj, "clearColor", 1)->NumberValue();
+					gameConfig_.window.graphics.clearColor[2] = Parser::getArrayVal(graphicsObj, "clearColor", 2)->NumberValue();
+					gameConfig_.window.graphics.clearColor[3] = Parser::getArrayVal(graphicsObj, "clearColor", 3)->NumberValue();
+				}
+				else
+				{
+					gameConfig_.window.graphics.clearColor[0] = 0.0f;
+					gameConfig_.window.graphics.clearColor[1] = 0.0f;
+					gameConfig_.window.graphics.clearColor[2] = 0.0f;
+					gameConfig_.window.graphics.clearColor[3] = 1.0f;
 				}
 			}
 
