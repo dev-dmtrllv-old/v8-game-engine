@@ -100,11 +100,6 @@ namespace NovaEngine
 			engine->gameWindow.show();
 		}
 
-		SCRIPT_METHOD(onSceneSpawn)
-		{
-			Logger::get()->info("SPAWN GAME OBJECT!!!!!!!!!!!!!!!!!!!!!!");
-		}
-
 		SCRIPT_METHOD(onGetActiveScene)
 		{
 			Logger::get()->info("GET ACTIVE SCENE!!!!!!!!!!!!!!!!!!!!!!");
@@ -127,11 +122,12 @@ namespace NovaEngine
 			auto windowObj = engineObject.newObject("window");
 			windowObj.set("show", onShowWindow);
 
-			ScriptManager::ClassBuilder sceneClass = ScriptManager::ClassBuilder(isolate, "Scene");
+			ScriptManager::ClassBuilder sceneClass = ScriptManager::ClassBuilder(isolate, "Scene", 1);
+
 			sceneClass.set("load", emptyFunction);
 			sceneClass.set("start", emptyFunction);
 			sceneClass.set("stop", emptyFunction);
-			sceneClass.set("spawn", onSceneSpawn);
+			sceneClass.set("spawn", Scene::onSpawnGameObject);
 
 			globalObject.set("Scene", sceneClass.build());
 		};
@@ -151,7 +147,6 @@ namespace NovaEngine
 		graphicsManager(this),
 		jobScheduler(this),
 		sceneManager(this),
-		entityManager(this),
 		componentManager(this),
 		gameWindow(this)
 	{
@@ -222,8 +217,6 @@ namespace NovaEngine
 
 		CHECK_REJECT(initSubSystem("Scene Manager", &sceneManager), rejectGameConfig, "Could not initialize Scene Manager!");
 
-		CHECK_REJECT(initSubSystem("Entity Manager", &entityManager), rejectGameConfig, "Could not initialize Entity Manager!");
-
 		CHECK_REJECT(initSubSystem("Component Manager", &componentManager), rejectGameConfig, "Could not initialize Component Manager!");
 
 		return true;
@@ -276,15 +269,13 @@ namespace NovaEngine
 		{
 			Logger::get()->info("starting engine with scene ", startSceneName, "...");
 
-			eventManager.on(WindowManagerEvents::ALL_WINDOWS_CLOSED, [](EventManager::EventData& data)
-			{
+			eventManager.on(WindowManagerEvents::ALL_WINDOWS_CLOSED, [](EventManager::EventData& data) {
 				Logger::get()->info("All windows closed event callback!");
-				// isRunning_ = false;
 				data.engine->isRunning_ = false;
 			});
 
 			isRunning_ = true;
-			
+
 			sceneManager.loadScene(startSceneName);
 
 			JobSystem::JobInfo jobs[1] = {
@@ -329,7 +320,7 @@ namespace NovaEngine
 
 		if (Hasher::check(a, "123123"))
 		{
-			std::cout << "HASH " << a <<  " <-> 123123 MATCHED!" << std::endl;
+			std::cout << "HASH " << a << " <-> 123123 MATCHED!" << std::endl;
 		}
 
 		return true;

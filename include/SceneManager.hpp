@@ -2,6 +2,7 @@
 
 #include "SubSystem.hpp"
 #include "Scene.hpp"
+#include "Hash.hpp"
 
 namespace NovaEngine
 {
@@ -10,7 +11,7 @@ namespace NovaEngine
 	private:
 		typedef v8::Global<v8::Object> JSScene;
 
-		std::unordered_map<std::string, Scene> scenes_;
+		std::unordered_map<Hash, Scene*> scenes_;
 
 		Scene* activeScene_;
 

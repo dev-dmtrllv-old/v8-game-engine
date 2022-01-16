@@ -26,7 +26,7 @@ namespace NovaEngine
 
 	void SceneManager::addJSScene(const char* name, v8::Isolate* isolate, v8::Local<v8::Object> jsScene)
 	{
-		scenes_.emplace(name, Scene(engine(), isolate, jsScene));
+		scenes_[Hasher::hash(name)] = new Scene(engine(), isolate, jsScene);
 	}
 
 	bool SceneManager::onTerminate()
@@ -37,21 +37,14 @@ namespace NovaEngine
 
 	bool SceneManager::loadScene(const char* sceneName)
 	{
-		for (std::pair<const std::string, Scene>& p : scenes_)
+		Hash id = Hasher::hash(sceneName);
+		if(scenes_.contains(id))
 		{
-			if (strcmp(p.first.c_str(), sceneName) == 0)
-			{
-				if (&p.second == activeScene_)
-				{
-					return false;
-				}
-				else
-				{
-					p.second.load();
-					activeScene_ = &p.second;
-				}
-			}
+			scenes_[id]->load();
+			activeScene_ = scenes_[id];
+			return true;
 		}
+
 		return false;
 	}
 };

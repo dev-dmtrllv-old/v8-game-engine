@@ -6,7 +6,6 @@
 #include "ComponentSystem.hpp"
 #include "Types.hpp"
 #include "BitMap.hpp"
-#include "EntityManager.hpp"
 
 namespace NovaEngine
 {

@@ -58,4 +58,6 @@
 
 #pragma endregion
 
+using V8CallbackArgs = const v8::FunctionCallbackInfo<v8::Value>&;
+
 #endif

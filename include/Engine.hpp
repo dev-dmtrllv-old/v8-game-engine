@@ -11,7 +11,6 @@
 #include "job_system/JobScheduler.hpp"
 #include "graphics/GraphicsManager.hpp"
 #include "SceneManager.hpp"
-#include "EntityManager.hpp"
 #include "ComponentManager.hpp"
 #include "EventManager.hpp"
 
@@ -42,7 +41,6 @@ namespace NovaEngine
 		Graphics::GraphicsManager graphicsManager;
 		JobSystem::JobScheduler jobScheduler;
 		SceneManager sceneManager;
-		EntityManager entityManager;
 		ComponentManager componentManager;
 		GameWindow gameWindow;
 

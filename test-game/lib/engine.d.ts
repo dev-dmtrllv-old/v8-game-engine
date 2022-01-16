@@ -18,6 +18,8 @@ declare class Vector
  */
 declare class GameObject
 {
+	public readonly name: string;
+	
 	public constructor(name?: string);
 }
 

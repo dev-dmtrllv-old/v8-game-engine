@@ -5,6 +5,7 @@
 #include "Logger.hpp"
 
 #define SCRIPT_METHOD(name) static void name(const v8::FunctionCallbackInfo<v8::Value>& args)
+#define SCRIPT_METHOD_IMPL(className, name) void className::name(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 typedef const v8::FunctionCallbackInfo<v8::Value>& CallbackArgs;
 
@@ -196,23 +197,28 @@ namespace NovaEngine
 		class ClassBuilder
 		{
 		private:
+			static void onConstructCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+				v8::Isolate* isolate = args.GetIsolate();
+				if (!args.IsConstructCall())
+					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
+			}
+
 			v8::Isolate* isolate;
 			v8::Local<v8::FunctionTemplate> funcTemp;
 			v8::Local<v8::ObjectTemplate> protoTemp;
 
 		public:
-			ClassBuilder(v8::Isolate* isolate, const char* name) : isolate(isolate), funcTemp(v8::FunctionTemplate::New(isolate))
+			ClassBuilder(v8::Isolate* isolate, const char* name, size_t internalFieldCount = 0, void(*constructCallback)(V8CallbackArgs) = ClassBuilder::onConstructCallback) : isolate(isolate), funcTemp(v8::FunctionTemplate::New(isolate))
 			{
-				funcTemp->SetCallHandler([](const v8::FunctionCallbackInfo<v8::Value>& args) {
-					v8::Isolate* isolate = args.GetIsolate();
-					if (!args.IsConstructCall())
-						isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
-				});
+				funcTemp->SetCallHandler(constructCallback);
 
 				if (name != nullptr)
 					funcTemp->SetClassName(v8::String::NewFromUtf8(isolate, name));
 
 				protoTemp = funcTemp->PrototypeTemplate();
+
+				if (internalFieldCount > 0)
+					setInternalFieldCount(internalFieldCount);
 			}
 
 			ClassBuilder& set(const char* name, int num)
@@ -254,6 +260,12 @@ namespace NovaEngine
 			ClassBuilder& set(const char* name, v8::FunctionCallback func)
 			{
 				protoTemp->Set(isolate, name, v8::FunctionTemplate::New(isolate, func));
+				return *this;
+			}
+
+			ClassBuilder& setInternalFieldCount(size_t count)
+			{
+				funcTemp->InstanceTemplate()->SetInternalFieldCount(count);
 				return *this;
 			}
 
