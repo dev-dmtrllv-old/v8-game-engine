@@ -6,7 +6,6 @@ namespace NovaEngine
 {
 	bool ComponentManager::onInitialize()
 	{
-		// register default ComponentSystems
 		registerSystem<TransformSystem>();
 		return true;
 	}

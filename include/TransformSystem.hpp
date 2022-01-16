@@ -1,15 +1,19 @@
 #pragma once
 
-#include "Transform.hpp"
 #include "ComponentSystem.hpp"
 
 namespace NovaEngine
 {
-	class TransformSystem : public ComponentSystem<Transform>
+	class TransformSystem : public ComponentSystem
 	{
 		public:
-			TransformSystem() : ComponentSystem() {}
+			ENGINE_COMPONENT_CTOR(TransformSystem) {}
+			~TransformSystem();
 
-			const char* name() { return "transform"; }
+			virtual const char* name() override;
+
+			virtual void onInitialize() override;
+
+			virtual void update() override;
 	};
 };

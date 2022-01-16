@@ -1,21 +1,33 @@
 #pragma once
 
+#include "Entity.hpp"
+
+#define ENGINE_COMPONENT_CTOR(name) name(ComponentManager* manager) : ComponentSystem(manager)
+
 namespace NovaEngine
 {
-	class IComponentSystem
+	class ComponentManager;
+
+	struct Component
 	{
-	public:
-		virtual const char* name() = 0;
-		virtual ~IComponentSystem() = default;
+		const Entity entity;
+		Component(Entity entity) : entity(entity) {}
+		virtual ~Component() = default;
 	};
 
-	template<typename ...Ts>
-	class ComponentSystem : public IComponentSystem
+	class ComponentSystem
 	{
+	private:
+		ComponentManager* manager_;
+
 	public:
-		ComponentSystem() : IComponentSystem() {}
-		
-		virtual const char* name() = 0;
+		ComponentSystem(ComponentManager* manager);
 		virtual ~ComponentSystem() = default;
+
+		virtual const char* name() = 0;
+		virtual void update() = 0;
+		virtual void onInitialize() = 0;
+
+		ComponentManager* manager();
 	};
 };

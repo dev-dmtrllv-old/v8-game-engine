@@ -22,7 +22,7 @@ CC_WARNING_ERRORS = return-type
 DISABLED_CC_WARNINGS = unknown-pragmas unused-function unused-variable unused-result
 
 CC = g++-11
-CFLAGS = -g -std=c++2a -O3 $(patsubst %,-Werror=%,$(CC_WARNING_ERRORS)) -Wall $(patsubst %,-Wno-%,$(DISABLED_CC_WARNINGS)) $(INCLUDE_DIRS) $(DEFINES)
+CFLAGS = -g -std=c++2a -O3 $(patsubst %,-Werror=%,$(CC_WARNING_ERRORS)) -Wall -frtti $(patsubst %,-Wno-%,$(DISABLED_CC_WARNINGS)) $(INCLUDE_DIRS) $(DEFINES)
 LDFLAGS = -g -L$(V8_DIR) $(LIBS) $(DEFINES) -pthread  -lpthread
 
 DIRS := $(shell find src -type d)

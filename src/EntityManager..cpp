@@ -18,7 +18,7 @@ namespace NovaEngine
 		std::lock_guard<std::mutex> guard(spawnMutex_);
 		const size_t index = entities_.size();
 		for(size_t i = 0; i < t; i++)
-			entities_.push_back(Entity(entityCounter_++));
+			entities_.push_back(entityCounter_++);
 		return &entities_[index];
 	}
 };
