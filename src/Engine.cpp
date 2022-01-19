@@ -314,15 +314,6 @@ namespace NovaEngine
 
 		Logger::terminate();
 
-		glfwTerminate();
-
-		Hash a = Hasher::hash("123123");
-
-		if (Hasher::check(a, "123123"))
-		{
-			std::cout << "HASH " << a << " <-> 123123 MATCHED!" << std::endl;
-		}
-
 		return true;
 	}
 };

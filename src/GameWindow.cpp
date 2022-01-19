@@ -5,23 +5,9 @@
 
 namespace NovaEngine
 {
-	GameWindow* GameWindow::firstWindow_ = nullptr;
-	bool GameWindow::isGlfwInitialized_ = false;
+	GameWindow::GameWindow(Engine* engine) : engine_(engine), window_(nullptr), title_(), isDestroyed_(false) {  }
 
-	GameWindow::GameWindow(Engine* engine) : engine_(engine), window_(nullptr), title_(), isDestroyed_(false)
-	{
-		if (!isGlfwInitialized_)
-		{
-			isGlfwInitialized_ = glfwInit() != GLFW_FALSE;
-			if (!isGlfwInitialized_)
-				throw "Could not initialize GLFW!";
-		}
-	}
-
-	GameWindow::~GameWindow()
-	{
-
-	}
+	GameWindow::~GameWindow() {  }
 
 	bool GameWindow::create(const char* title, const GameWindowConfig& config)
 	{
@@ -34,11 +20,8 @@ namespace NovaEngine
 			glfwWindowHint(GLFW_RESIZABLE, config.resizable);
 			glfwWindowHint(GLFW_MAXIMIZED, config.maximized);
 			glfwWindowHint(GLFW_VISIBLE, !config.hidden);
-
-
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-			glfwSwapInterval(1);
 
 			window_ = glfwCreateWindow(config.width, config.height, title, nullptr, nullptr);
 
@@ -48,11 +31,7 @@ namespace NovaEngine
 				return false;
 			}
 
-			if (firstWindow_ == nullptr)
-				firstWindow_ = this;
-
 			glfwSetWindowUserPointer(window_, this);
-
 			glfwSetWindowSizeLimits(window_, config.minWidth, config.minHeight, config.maxHeight, config.maxHeight);
 			glfwSwapInterval(1);
 

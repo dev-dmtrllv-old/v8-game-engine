@@ -16,12 +16,18 @@ namespace NovaEngine
 		GameWindow* gameWindow = reinterpret_cast<GameWindow*>(glfwGetWindowUserPointer(window));
 		Engine* engine = gameWindow->engine();
 		gameWindow->destroy();
-		if(engine->windowManager.allWindowsClosed())
+		if (engine->windowManager.allWindowsClosed())
 			engine->eventManager.emit(WindowManagerEvents::ALL_WINDOWS_CLOSED, nullptr);
 	}
 
 	bool WindowManager::onInitialize()
 	{
+		if (glfwInit() == GLFW_FALSE)
+		{
+			Logger::get()->error("Could not initialize GLFW!");
+			return false;
+		}
+
 		Engine* e = engine();
 
 		if (!e->gameWindow.create(e->configManager.getGameName().c_str(), e->configManager.getWindowConfig()))
@@ -37,6 +43,7 @@ namespace NovaEngine
 
 	bool WindowManager::onTerminate()
 	{
+		glfwTerminate();
 		return true;
 	}
 
