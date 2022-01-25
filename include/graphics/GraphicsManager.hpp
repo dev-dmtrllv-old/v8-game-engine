@@ -2,7 +2,6 @@
 
 #include "SubSystem.hpp"
 #include "framework.hpp"
-#include "Context.hpp"
 
 namespace NovaEngine
 {
@@ -10,19 +9,21 @@ namespace NovaEngine
 
 	namespace Graphics
 	{
+		class Renderer;
+		
 		class GraphicsManager : public SubSystem<>
 		{
 		private:
-			Context context_;
+			std::unordered_map<GameWindow*, Renderer*> renderers_;
 
 		public:
-			ENGINE_SUB_SYSTEM_CTOR(GraphicsManager), context_() {}
+			ENGINE_SUB_SYSTEM_CTOR(GraphicsManager), renderers_() {}
 
 		protected:
 			bool onInitialize();
 			bool onTerminate();
 
-			void render();
+			void setRenderer(GameWindow* w);
 		};
 	};
 };

@@ -3,93 +3,142 @@
 #include "SubSystem.hpp"
 #include "framework.hpp"
 #include "Logger.hpp"
-#include "ComponentSystem.hpp"
 #include "Types.hpp"
-#include "BitMap.hpp"
+#include "Hash.hpp"
+#include "BitMask.hpp"
+#include "Entity.hpp"
 
 namespace NovaEngine
 {
+	class ComponentManager;
+
+	class IComponentSystem
+	{
+	private:
+		ComponentManager* manager_;
+
+	public:
+		const size_t bitMask;
+
+		IComponentSystem(ComponentManager* manager, BitMask::Type bitMask) : manager_(manager), bitMask(bitMask) {};
+		virtual ~IComponentSystem() = default;
+
+		ComponentManager* manager() { return manager_; }
+
+		virtual const char* name() = 0;
+		virtual void update() = 0;
+
+	protected:
+		std::vector<Entity*> entities_;
+
+		void addEntitiy(Entity* entity)
+		{
+			entities_.push_back(entity);
+			Logger::get()->info("Add Entity To Component System ", name());
+		}
+
+		friend class ComponentManager;
+	};
+
+
+	template<typename... Ts>
+	class ComponentSystem;
+
 	class ComponentManager : public SubSystem<>
 	{
-	public:
-		class IAllocator
-		{
-			virtual void* alloc(size_t size);
-			virtual void free(void*, size_t size);
-		};
-
-		template<typename T>
-		class Allocator
-		{
-			virtual T* alloc(size_t size = sizeof(T)) override { return new T(); };
-			virtual void free(void* ptr, size_t size) override { ::free(ptr); };
-		};
-
 	private:
-		std::unordered_map<const char*, const char*> idToNameMap_;
-		std::unordered_map<const char*, const char*> nameToIdMap_;
-		std::unordered_map<const char*, ComponentSystem*> componentSystems_;
-		std::unordered_map<size_t, IAllocator*> componentAllocators_;
-		std::unordered_map<const char*, size_t> nameToComponentBit_;
-		BitMap componentBitMap_;
+		std::unordered_map<Hash, IComponentSystem*> systems_;
+		std::unordered_map<Hash, BitMask::Type> componentToBitmask_;
+		BitMask::Generator bitMaskGenerator_;
 
 	public:
 		ENGINE_SUB_SYSTEM_CTOR(ComponentManager),
-			idToNameMap_(),
-			nameToIdMap_(),
-			componentSystems_(),
-			componentAllocators_(),
-			nameToComponentBit_(),
-			componentBitMap_()
-		{};
+			systems_(),
+			bitMaskGenerator_()
+		{}
 
 	protected:
 		bool onInitialize();
 		bool onTerminate();
 
-	public:
-		template<Types::DerivedFrom<ComponentSystem> T>
-		T* registerSystem()
+		void registerSystem(Hash name, IComponentSystem* componentSystem);
+
+		template<typename T>
+		Hash componentToHash()
 		{
-			const char* id = typeid(T).name();
-			if(!idToNameMap_.contains(id))
-			{
-				T* system = new T(this);
-				componentSystems_.emplace(id, system);
-				idToNameMap_.emplace(id, system->name());
-				nameToIdMap_.emplace(system->name(), id);
-				return system;
-			}
-			else
-			{
-				return static_cast<T*>(componentSystems_[id]);
-			}
+			return Hasher::hash(typeid(T).name());
 		}
 
 		template<typename T>
-		const size_t getComponentBit()
+		BitMask::Type componentToBitMask()
 		{
-			const char* id = typeid(T).name();
-			if(!nameToComponentBit_.contains(id))
-			{
-				const size_t bit = componentBitMap_.generate();
-				nameToComponentBit_[id] = bit;
-				return bit;
-			}
-			
-			return nameToComponentBit_[id];
+			return componentToBitmask_[componentToHash<T>()];
 		}
 
-		template<Types::DerivedFrom<Component> T>
-		T* addComponent(Entity entity)
+	public:
+		template<Types::DerivedFrom<IComponentSystem> T>
+		T* registerSystem()
 		{
 			const char* id = typeid(T).name();
-			if(nameToComponentBit_.contains(id))
-			{
-				const size_t bit = nameToComponentBit_[id];
-				return static_cast<Allocator<T>*>(componentAllocators_[bit])->alloc();
-			}
-			return nullptr;
+			const Hash hash = Hasher::hash(id);
+
+			std::string hashString = std::to_string(hash);
+
+
+
+			if (!systems_.contains(hash))
+				registerSystem(hash, new T(this));
+
+			std::string bitMaskString = std::to_string(static_cast<T*>(systems_[hash])->bitMask);
+
+			Logger::get()->info("Registering Component-System with ID: ", id, " Hash: ", hashString.c_str(), " BitMask ", bitMaskString.c_str());
+			return static_cast<T*>(systems_[hash]);
 		}
+
+		template<typename T>
+		T* addComponent(Entity* entity)
+		{
+			if (entity->componentsBitMask == 0)
+				entity->componentsBitMask = componentToBitMask<T>();
+			else
+				entity->componentsBitMask |= componentToBitMask<T>();
+			
+			for (const std::pair<const Entity::IDCounter, IComponentSystem*> p : systems_)
+				if (p.second->bitMask & ~entity->componentsBitMask)
+					p.second->addEntitiy(entity);
+			
+			return new T();
+		}
+
+		template<typename ...Ts>
+		BitMask::Type getComponentBitMask()
+		{
+			std::vector<const char*> names = std::vector<const char*>();
+			names.insert(names.end(), { typeid(Ts).name()... });
+			BitMask::Type mask = 0;
+			for (const char* id : names)
+			{
+				Hash hash = Hasher::hash(id);
+				if (!componentToBitmask_.contains(hash))
+				{
+					std::string hashString = std::to_string(hash);
+					Logger::get()->info("Registering Component-Data-Struct with ID: ", id, " Hash: ", hashString.c_str());
+					componentToBitmask_.emplace(hash, bitMaskGenerator_.generate());
+				}
+				mask += componentToBitmask_[hash];
+			}
+			return mask;
+		}
+	};
+
+	template<typename... Ts>
+	class ComponentSystem : public IComponentSystem
+	{
+	public:
+		ComponentSystem(ComponentManager* manager) : IComponentSystem(manager, manager->getComponentBitMask<Ts...>()) {};
+		virtual ~ComponentSystem() = default;
+
+		virtual const char* name() = 0;
+		virtual void update() = 0;
 	};
 };

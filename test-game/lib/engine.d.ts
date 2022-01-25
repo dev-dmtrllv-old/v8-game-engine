@@ -19,8 +19,10 @@ declare class Vector
 declare class GameObject
 {
 	public readonly name: string;
+
+	public get position(): Vector;
 	
-	public constructor(name?: string);
+	public constructor(name?: string, position?: Vector);
 }
 
 declare abstract class Scene

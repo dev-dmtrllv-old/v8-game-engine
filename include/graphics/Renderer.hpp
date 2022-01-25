@@ -19,6 +19,6 @@ namespace NovaEngine::Graphics
 			bool onInitialize();
 			bool onTerminate();
 
-			virtual void render(Context& context);
+			virtual void render();
 	};
 };

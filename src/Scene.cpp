@@ -1,5 +1,6 @@
 #include "Scene.hpp"
 #include "Engine.hpp"
+#include "Transform.hpp"
 
 namespace NovaEngine
 {
@@ -45,7 +46,7 @@ namespace NovaEngine
 					args.This()->Set(ctx, v8::String::NewFromUtf8(isolate, "name"), first);
 					if(arguments->Length() == 2)
 					{
-
+						
 					}
 				}
 				else if (first->IsObject())
@@ -85,14 +86,16 @@ namespace NovaEngine
 		}
 	}
 
-	Entity Scene::spawn(size_t n)
+	Entity* Scene::spawn(size_t n)
 	{
 		assert(n > 0);
 		std::lock_guard<std::mutex> guard(spawnMutex_);
 		const size_t index = entities_.size();
 		for (size_t i = 0; i < n; i++)
+		{
 			entities_.push_back(entityCounter_++);
-		return entities_[index];
+		}
+		return &entities_[index];
 	}
 
 	SCRIPT_METHOD_IMPL(Scene, onSpawnGameObject)
@@ -101,7 +104,8 @@ namespace NovaEngine
 		Engine* engine = ScriptManager::fetchEngineFromArgs(args);
 		Scene* scene = static_cast<Scene*>(args.This()->GetInternalField(0).As<v8::External>()->Value());
 		assert(scene != nullptr);
-		Entity entity = scene->spawn();
+		Entity* entity = scene->spawn();
+		engine->componentManager.addComponent<Transform>(entity);
 		const size_t l = args.Length();
 		v8::Local<v8::Array> argsList = v8::Array::New(isolate, l);
 		for (size_t i = 0; i < l; i++)
@@ -110,6 +114,7 @@ namespace NovaEngine
 		v8::Local<v8::Function> goClass = scene->gameObjectTemplate_.Get(isolate);
 		v8::Local<v8::Value> go = goClass->CallAsConstructor(isolate->GetCurrentContext(), l, &argsListVal).ToLocalChecked();
 		go.As<v8::Object>()->SetInternalField(0, v8::External::New(isolate, scene));
+		go.As<v8::Object>()->SetInternalField(1, v8::External::New(isolate, entity));
 		args.GetReturnValue().Set(go);
 	}
 };

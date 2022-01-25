@@ -208,9 +208,9 @@ namespace NovaEngine
 			v8::Local<v8::ObjectTemplate> protoTemp;
 
 		public:
-			ClassBuilder(v8::Isolate* isolate, const char* name, size_t internalFieldCount = 0, void(*constructCallback)(V8CallbackArgs) = ClassBuilder::onConstructCallback) : isolate(isolate), funcTemp(v8::FunctionTemplate::New(isolate))
+			ClassBuilder(v8::Isolate* isolate, const char* name, size_t internalFieldCount = 0, void(*constructCallback)(V8CallbackArgs) = ClassBuilder::onConstructCallback, void* data = nullptr) : isolate(isolate), funcTemp(v8::FunctionTemplate::New(isolate))
 			{
-				funcTemp->SetCallHandler(constructCallback);
+				funcTemp->SetCallHandler(constructCallback, v8::External::New(isolate, data));
 
 				if (name != nullptr)
 					funcTemp->SetClassName(v8::String::NewFromUtf8(isolate, name));

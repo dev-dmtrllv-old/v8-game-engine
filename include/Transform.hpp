@@ -7,5 +7,8 @@ namespace NovaEngine
 	struct Transform
 	{
 		Vector2 position;
+
+		Transform() : position() {}
+		Transform(const Transform&) = delete;
 	};
 };

@@ -4,6 +4,8 @@ export class TestScene extends Scene
 	{
 		const gameObject = this.spawn("hyaaaaa!");
 		Engine.log("spawned gameobject with name ", gameObject.name);
+		const o2 = new GameObject("test woop");
+		Engine.log("spawned gameobject with name ", o2.name);
 	}
 
 	protected start(): void

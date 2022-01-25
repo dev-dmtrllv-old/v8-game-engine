@@ -16,7 +16,7 @@ namespace NovaEngine
 		v8::Global<v8::Function> gameObjectTemplate_;
 		v8::Global<v8::Object> jsScene_;
 		std::mutex spawnMutex_;
-		Entity entityCounter_;
+		Entity::IDCounter entityCounter_;
 		std::vector<Entity> entities_;
 		std::unordered_map<Hash, Entity*> namedEntities_;
 
@@ -32,7 +32,7 @@ namespace NovaEngine
 		void start();
 		void stop();
 
-		Entity spawn(size_t n = 1);
+		Entity* spawn(size_t n = 1);
 
 		SCRIPT_METHOD(onSpawnGameObject);
 	};

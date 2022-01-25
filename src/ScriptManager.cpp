@@ -7,7 +7,6 @@ namespace NovaEngine
 
 	bool ScriptManager::onInitialize(ScriptManagerGlobalInitializer globalInitializer)
 	{
-
 		platform_ = v8::platform::NewDefaultPlatform();
 		v8::V8::InitializePlatform(platform_.get());
 		v8::V8::Initialize();

@@ -25,5 +25,7 @@ namespace NovaEngine
 		bool onTerminate();
 
 		bool loadScene(const char* sceneName);
+
+		Scene* activeScene();
 	};
 };

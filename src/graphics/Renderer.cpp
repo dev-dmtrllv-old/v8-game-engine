@@ -1,5 +1,4 @@
 #include "graphics/Renderer.hpp"
-#include "graphics/Context.hpp"
 
 namespace NovaEngine::Graphics
 {
@@ -13,7 +12,7 @@ namespace NovaEngine::Graphics
 		return true;
 	}
 
-	void Renderer::render(Context& context)
+	void Renderer::render()
 	{
 		
 	}

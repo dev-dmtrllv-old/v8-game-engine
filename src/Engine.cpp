@@ -1,5 +1,6 @@
 #include "Engine.hpp"
 #include "Logger.hpp"
+#include "TransformSystem.hpp"
 
 #define CHECK_REJECT(subSystem, rejector, msg) if(!subSystem) { rejector(msg); Logger::get()->error(#subSystem ":" #rejector " -> " msg); return false; }
 
@@ -108,8 +109,10 @@ namespace NovaEngine
 
 		static void globalInitializer(ScriptManager* manager, const v8::Local<v8::Object>& global)
 		{
-			v8::Isolate* isolate = manager->isolate();
-			v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+			using namespace v8;
+
+			Isolate* isolate = manager->isolate();
+			Local<Context> ctx = isolate->GetCurrentContext();
 
 			auto globalObject = ScriptManager::ObjectBuilder(global, isolate, ctx);
 
@@ -130,6 +133,48 @@ namespace NovaEngine
 			sceneClass.set("spawn", Scene::onSpawnGameObject);
 
 			globalObject.set("Scene", sceneClass.build());
+
+			ScriptManager::ClassBuilder vector2Class = ScriptManager::ClassBuilder(isolate, "Vector", 0, [](V8CallbackArgs args) {
+				Isolate* isolate = args.GetIsolate();
+				Local<Context> ctx = isolate->GetCurrentContext();
+				Local<Object> this_ = args.This();
+
+				size_t l = args.Length();
+				if (l == 0)
+				{
+					this_->Set(ctx, String::NewFromUtf8(isolate, "x"), Number::New(isolate, 0));
+					this_->Set(ctx, String::NewFromUtf8(isolate, "y"), Number::New(isolate, 0));
+				}
+				else if (l == 1)
+				{
+					this_->Set(ctx, String::NewFromUtf8(isolate, "x"), args[0]->ToNumber(isolate));
+					this_->Set(ctx, String::NewFromUtf8(isolate, "y"), args[0]->ToNumber(isolate));
+				}
+				else if (l == 2)
+				{
+					this_->Set(ctx, String::NewFromUtf8(isolate, "x"), args[0]->ToNumber(isolate));
+					this_->Set(ctx, String::NewFromUtf8(isolate, "y"), args[1]->ToNumber(isolate));
+				}
+			});
+
+			globalObject.set("Vector2", vector2Class.build());
+
+			ScriptManager::ClassBuilder gameObjectClass = ScriptManager::ClassBuilder(isolate, "GameObject", 2, [](V8CallbackArgs args) {
+				Isolate* isolate = args.GetIsolate();
+				Engine* engine = static_cast<Engine*>(args.Data().As<v8::External>()->Value());
+				Scene* scene = engine->sceneManager.activeScene();
+			
+				Local<Object> this_ = args.This();
+
+				if (scene != nullptr)
+				{
+					Entity* e = scene->spawn();
+					this_->SetInternalField(0, External::New(isolate, scene));
+					this_->SetInternalField(1, External::New(isolate, e));
+				}
+			}, manager->engine());
+
+			globalObject.set("GameObject", gameObjectClass.build());
 		};
 	};
 #pragma endregion
@@ -277,6 +322,10 @@ namespace NovaEngine
 			isRunning_ = true;
 
 			sceneManager.loadScene(startSceneName);
+
+			// TransformSystem* ts = componentManager.getSystem<TransformSystem>();
+
+			// ts->update();
 
 			JobSystem::JobInfo jobs[1] = {
 				{ WindowManager::pollEvents }

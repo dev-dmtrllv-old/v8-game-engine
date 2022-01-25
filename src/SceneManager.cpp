@@ -47,4 +47,9 @@ namespace NovaEngine
 
 		return false;
 	}
+
+	Scene* SceneManager::activeScene()
+	{
+		return activeScene_;
+	}
 };
