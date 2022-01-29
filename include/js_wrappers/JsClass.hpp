@@ -2,19 +2,18 @@
 
 #include "framework.hpp"
 #include "BitMask.hpp"
-
-#define JS_CLASS_IMPL() virtual void build(Engine* engine, JsClass::Builder& builder)
+#include "js_wrappers/JsMethodHelpers.hpp"
 
 namespace NovaEngine
 {
-	class ScriptManager;
 	class Engine;
 
 	namespace JsWrappers
 	{
 		class JsClass
 		{
-			static void onConstructCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+			static void onConstructCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+			{
 				v8::Isolate* isolate = args.GetIsolate();
 				if (!args.IsConstructCall())
 					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
@@ -38,7 +37,7 @@ namespace NovaEngine
 				Builder(v8::Isolate* isolate, const char* name) : isolate(isolate), funcTemp(v8::FunctionTemplate::New(isolate))
 				{
 					setConstructor(emptyCtor);
-					
+
 					if (name != nullptr)
 						funcTemp->SetClassName(v8::String::NewFromUtf8(isolate, name));
 
@@ -115,7 +114,7 @@ namespace NovaEngine
 
 			virtual void build(Engine* engine, Builder& builder) = 0;
 
-			virtual v8::Local<v8::FunctionTemplate> create(Engine* engine, v8::Isolate* isolate, const char* name) final
+			v8::Local<v8::FunctionTemplate> create(Engine* engine, v8::Isolate* isolate, const char* name)
 			{
 				Builder builder = Builder(isolate, name);
 				build(engine, builder);

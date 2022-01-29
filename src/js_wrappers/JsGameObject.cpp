@@ -1,5 +1,5 @@
 #include "js_wrappers/JsGameObject.hpp"
-#include "framework.hpp"
+
 #include "Engine.hpp"
 #include "Scene.hpp"
 #include "ScriptManager.hpp"
@@ -7,7 +7,7 @@
 
 namespace NovaEngine::JsWrappers
 {
-	SCRIPT_METHOD_IMPL(JsGameObject, addComponent)
+	JS_METHOD_IMPL(JsGameObject, addComponent)
 	{
 		// Entity* entity = ScriptManager::getInternalFromArgs<Entity*>(args, 1);
 		// BitMask::Type bitMask = ScriptManager::getComponentBitMask(args.GetIsolate(), args[0]);
@@ -28,12 +28,12 @@ namespace NovaEngine::JsWrappers
 		// }
 	}
 
-	SCRIPT_METHOD_IMPL(JsGameObject, getComponent)
+	JS_METHOD_IMPL(JsGameObject, getComponent)
 	{
 
 	}
 
-	SCRIPT_METHOD_IMPL(JsGameObject, removeComponent)
+	JS_METHOD_IMPL(JsGameObject, removeComponent)
 	{
 
 	}

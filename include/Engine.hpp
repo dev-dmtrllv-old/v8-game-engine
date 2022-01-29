@@ -21,8 +21,12 @@ namespace NovaEngine
 	private:
 		static char executablePath_[PATH_MAX];
 
-		std::stack<std::pair<const char*, Terminatable*>> subsystemTerminateOrder_;
+		std::stack<std::pair<const char*, Terminatable*>> subsystemTerminateStack_;
 		bool isRunning_;
+
+		v8::Global<v8::Promise::Resolver> configurePromiseResolver_;
+		v8::Global<v8::Function> onLoadCallback_;
+		v8::Global<v8::Object> configuredValue_;
 
 		Engine();
 
@@ -33,6 +37,9 @@ namespace NovaEngine
 			return instance_;
 		}
 
+		void setOnLoadCallback(v8::Local<v8::Function> callback);
+		void setConfigValue(v8::Local<v8::Object> config, v8::Local<v8::Promise::Resolver> resolver);
+		
 		EventManager eventManager;
 		AssetManager assetManager;
 		ScriptManager scriptManager;
@@ -75,7 +82,7 @@ namespace NovaEngine
 			}
 			else
 			{
-				subsystemTerminateOrder_.push(std::pair(name, dynamic_cast<Terminatable*>(subSystem)));
+				subsystemTerminateStack_.push(std::pair(name, dynamic_cast<Terminatable*>(subSystem)));
 				l->info(name, " initialized!");
 				return true;
 			}

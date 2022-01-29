@@ -8,22 +8,7 @@
 #include "Types.hpp"
 #include "Hash.hpp"
 
-#define CLASS_SCRIPT_METHOD(name) static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine, v8::Isolate* isolate); \
-static void name(const v8::FunctionCallbackInfo<v8::Value>& args) \
-{ \
-	name ## _caller(args, ScriptManager::fetchEngineFromArgs(args), args.GetIsolate());\
-} \
-
-#define SCRIPT_METHOD(name) static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine, v8::Isolate* isolate); \
-static void name(const v8::FunctionCallbackInfo<v8::Value>& args) \
-{ \
-	name ## _caller(args, ScriptManager::fetchEngineFromArgs(args), args.GetIsolate());\
-} \
-static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine, v8::Isolate* isolate)
-
-#define SCRIPT_METHOD_IMPL(className, name) void className::name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine, v8::Isolate* isolate)
 #define COMPONENT_BIT_MASK_VALUE "__COMPONENT_BITMASK__"
-
 
 #define V8STR(str) v8::String::NewFromUtf8(isolate, str)
 
@@ -33,9 +18,7 @@ namespace NovaEngine
 {
 	class ScriptManager;
 
-	typedef void(*ScriptManagerGlobalInitializer)(ScriptManager* manager, const v8::Local<v8::Object>&);
-
-	class ScriptManager : public SubSystem<ScriptManagerGlobalInitializer>
+	class ScriptManager : public SubSystem<>
 	{
 	public:
 		struct RunInfo
@@ -117,10 +100,12 @@ namespace NovaEngine
 				f.second.Reset();
 		}
 
+		inline void initializeGlobal(v8::Local<v8::Object> globalObj);
+
 	protected:
 		bool runScript(v8::Local<v8::Context> context, const char* scriptString);
 
-		bool onInitialize(ScriptManagerGlobalInitializer globalInitializer);
+		bool onInitialize();
 		bool onTerminate();
 
 	public:
@@ -166,7 +151,7 @@ namespace NovaEngine
 			JsComponentClass c = JsComponentClass();
 
 			v8::Local<v8::FunctionTemplate> f = c.create(engine(), isolate(), name);
-			
+
 			registeredClasses_[hash].Reset(isolate(), f);
 			registeredComponents_[nativeHash] = &registeredClasses_[hash];
 
@@ -202,83 +187,6 @@ namespace NovaEngine
 
 	private:
 		void handleRequire(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-	public:
-		class ObjectBuilder
-		{
-		private:
-			v8::Local<v8::Object> boundObject;
-			v8::Isolate* isolate;
-			v8::Local<v8::Context> ctx;
-
-			inline v8::Local<v8::String> newString(const char* str)
-			{
-				return v8::String::NewFromUtf8(isolate, str, v8::NewStringType::kNormal).ToLocalChecked();
-			}
-
-		public:
-			ObjectBuilder(v8::Local<v8::Object> boundObject, v8::Isolate* isolate) :
-				boundObject(boundObject),
-				isolate(isolate),
-				ctx(isolate->GetCurrentContext())
-			{}
-
-			ObjectBuilder& set(const char* name, int num)
-			{
-				boundObject->Set(ctx, newString(name), v8::Number::New(isolate, num));
-				return *this;
-			}
-
-			ObjectBuilder& set(const char* name, unsigned int num)
-			{
-				boundObject->Set(ctx, newString(name), v8::Number::New(isolate, num));
-				return *this;
-			}
-
-			ObjectBuilder& set(const char* name, float num)
-			{
-				boundObject->Set(ctx, newString(name), v8::Number::New(isolate, num));
-				return *this;
-			}
-
-			ObjectBuilder& set(const char* name, double num)
-			{
-				boundObject->Set(ctx, newString(name), v8::Number::New(isolate, num));
-				return *this;
-			}
-
-			ObjectBuilder& set(const char* name, const char* string)
-			{
-				boundObject->Set(ctx, newString(name), newString(string));
-				return *this;
-			}
-
-			ObjectBuilder& set(const char* name, bool boolean)
-			{
-				boundObject->Set(ctx, newString(name), v8::Boolean::New(isolate, boolean));
-				return *this;
-			}
-
-			ObjectBuilder& set(const char* name, v8::FunctionCallback func)
-			{
-				boundObject->Set(ctx, newString(name), v8::Function::New(isolate, func));
-				return *this;
-			}
-
-			template <typename T>
-			ObjectBuilder& set(const char* name, T param)
-			{
-				boundObject->Set(ctx, newString(name), param);
-				return *this;
-			}
-
-			ObjectBuilder newObject(const char* name)
-			{
-				v8::Local<v8::Object> o = v8::Object::New(isolate);
-				boundObject->Set(ctx, newString(name), o);
-				return ObjectBuilder(o, isolate);
-			}
-		};
 	};
 }
 

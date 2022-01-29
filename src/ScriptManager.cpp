@@ -1,11 +1,13 @@
 #include "ScriptManager.hpp"
 #include "Engine.hpp"
+#include "js_wrappers/Wrappers.hpp"
+#include "Transform.hpp"
 
 namespace NovaEngine
 {
 	std::unique_ptr<v8::Platform> ScriptManager::platform_;
 
-	bool ScriptManager::onInitialize(ScriptManagerGlobalInitializer globalInitializer)
+	bool ScriptManager::onInitialize()
 	{
 		platform_ = v8::platform::NewDefaultPlatform();
 		v8::V8::InitializePlatform(platform_.get());
@@ -25,9 +27,7 @@ namespace NovaEngine
 		}
 
 		run([&](const RunInfo& info) {
-			v8::Local<v8::Object> global = info.context->Global();
-			globalInitializer(this, global);
-			global->Set(info.context, createString("require"), createFunction(onRequire));
+			initializeGlobal(info.context->Global());
 		});
 
 		return true;
@@ -52,19 +52,23 @@ namespace NovaEngine
 		return true;
 	}
 
-#pragma region v8 type creators
-
-	v8::Local<v8::String> ScriptManager::createString(const char* string)
+	void ScriptManager::initializeGlobal(v8::Local<v8::Object> globalObj)
 	{
-		return v8::String::NewFromUtf8(isolate_, string, v8::NewStringType::kNormal).ToLocalChecked();
-	}
+		using namespace JsWrappers;
 
-	v8::Local<v8::Function> ScriptManager::createFunction(v8::FunctionCallback cb)
-	{
-		return v8::Function::New(isolate_, cb, scriptManagerReference_.Get(isolate_));
-	}
+		JsWrappers::JsObject::Builder global = JsWrappers::JsObject::Builder(globalObj, isolate());
 
-#pragma endregion
+		global.set("require", v8::Function::New(isolate_, onRequire, scriptManagerReference_.Get(isolate_)));
+		global.set<JsEngine>("Engine");
+
+		v8::Local<v8::Function> transformClass = registerComponent<JsWrappers::JsTransform, Transform>("Transform");
+		v8::Local<v8::Function> gameObjectClass = registerClass<JsWrappers::JsGameObject>("Transform");
+		v8::Local<v8::Function> sceneClass = registerClass<JsWrappers::JsScene>("Scene");
+
+		global.set("Transform", transformClass);
+		global.set("GameObject", gameObjectClass);
+		global.set("Scene", sceneClass);
+	}
 
 	v8::Isolate* ScriptManager::isolate() { return isolate_; }
 	v8::Local<v8::Context> ScriptManager::context() { return context_.Get(isolate_); }
@@ -101,12 +105,12 @@ namespace NovaEngine
 
 		if (args.Length() < 1)
 		{
-
+			
 		}
 		else if (args[0]->IsString())
 		{
-			v8::Local<v8::Object> exports = ctx->Global()->Get(createString("exports"))->ToObject(isolate_);
-			v8::Local<v8::String> absPathStr = exports->Get(createString("__ABSOLUTE_PATH__"))->ToString(isolate_);
+			v8::Local<v8::Object> exports = ctx->Global()->Get(V8STR("exports"))->ToObject(isolate_);
+			v8::Local<v8::String> absPathStr = exports->Get(V8STR("__ABSOLUTE_PATH__"))->ToString(isolate_);
 
 			v8::String::Utf8Value absPathVal(isolate, absPathStr);
 
@@ -179,6 +183,7 @@ namespace NovaEngine
 	{
 		if (modules_.find(path) == modules_.end())
 		{
+			v8::Isolate* isolate = isolate_;
 			v8::Locker isolateLocker(isolate_);
 			v8::Isolate::Scope isolate_scope(isolate_);
 
@@ -193,20 +198,20 @@ namespace NovaEngine
 
 			v8::Local<v8::Object> global = context->Global();
 			v8::Local<v8::Object> exports = v8::Object::New(isolate_);
-			v8::MaybeLocal<v8::Value> prevExports = global->Get(context, createString("exports"));
+			v8::MaybeLocal<v8::Value> prevExports = global->Get(context, V8STR("exports"));
 
-			if (!exports->Set(context, createString("__ABSOLUTE_PATH__"), createString(path)).ToChecked())
+			if (!exports->Set(context, V8STR("__ABSOLUTE_PATH__"), V8STR(path)).ToChecked())
 			{
 				Logger::get()->warn("Failed to set __ABSOLUTE_PATH__!");
 				if (!prevExports.IsEmpty() && (moduleRequireCounter_ != 0))
-					global->Set(context, createString("exports"), prevExports.ToLocalChecked()->ToObject());
+					global->Set(context, V8STR("exports"), prevExports.ToLocalChecked()->ToObject());
 			}
 
-			if (!global->Set(context, createString("exports"), exports).ToChecked())
+			if (!global->Set(context, V8STR("exports"), exports).ToChecked())
 			{
 				Logger::get()->warn("Failed to set exports!");
 				if (!prevExports.IsEmpty() && (moduleRequireCounter_ != 0))
-					global->Set(context, createString("exports"), prevExports.ToLocalChecked()->ToObject());
+					global->Set(context, V8STR("exports"), prevExports.ToLocalChecked()->ToObject());
 			}
 
 			modules_[std::string(path)].Reset(isolate_, exports);
@@ -220,10 +225,10 @@ namespace NovaEngine
 			script->Run(context);
 
 			if (isJsonModule)
-				modules_[std::string(path)].Reset(isolate_, exports->Get(context, createString("data")).ToLocalChecked()->ToObject());
+				modules_[std::string(path)].Reset(isolate_, exports->Get(context, V8STR("data")).ToLocalChecked()->ToObject());
 
 			if (!prevExports.IsEmpty() && (moduleRequireCounter_ != 0))
-				global->Set(context, createString("exports"), prevExports.ToLocalChecked()->ToObject());
+				global->Set(context, V8STR("exports"), prevExports.ToLocalChecked()->ToObject());
 		}
 	}
 

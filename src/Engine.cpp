@@ -1,146 +1,20 @@
 #include "Engine.hpp"
 #include "Logger.hpp"
 #include "TransformSystem.hpp"
-#include "js_wrappers/JsClass.hpp"
-#include "js_wrappers/JsTransform.hpp"
-#include "js_wrappers/JsGameObject.hpp"
-#include "js_wrappers/JsScene.hpp"
+#include "js_wrappers/Wrappers.hpp"
 
 #define CHECK_REJECT(subSystem, rejector, msg) if(!subSystem) { rejector(msg); Logger::get()->error(#subSystem ":" #rejector " -> " msg); return false; }
 
 namespace NovaEngine
 {
-#pragma region Scripting Area
-	namespace
-	{
-		v8::Global<v8::Promise::Resolver> configurePromiseResolver_;
-		v8::Global<v8::Function> onLoadCallback_;
-		v8::Global<v8::Object> configuredValue_;
-
-		SCRIPT_METHOD(onEngineConfigure)
-		{
-			// v8::Isolate* isolate = args.GetIsolate();
-
-			if (args.Length() < 1)
-			{
-
-			}
-			else if (args[0]->IsObject())
-			{
-				v8::Local<v8::Promise::Resolver> resolver = v8::Promise::Resolver::New(isolate);
-				v8::Local<v8::Promise> p = resolver->GetPromise();
-				args.GetReturnValue().Set(p);
-				configurePromiseResolver_.Reset(isolate, resolver);
-				configuredValue_.Reset(isolate, args[0]->ToObject(isolate));
-			}
-		}
-
-		SCRIPT_METHOD(log)
-		{
-			std::string buf = "[Game]  ->  ";
-			for (int i = 0; i < args.Length(); i++)
-			{
-				auto a = args[i]->ToString(isolate);
-				v8::String::Utf8Value val(a);
-				buf += *val;
-				if (i != args.Length() - 1)
-					buf += ", ";
-			}
-			Logger::get()->info(buf);
-		}
-
-		SCRIPT_METHOD(emptyFunction)
-		{
-			args.GetReturnValue().Set(v8::Undefined(args.GetIsolate()));
-		}
-
-		// the game will call this to configure the engine
-		SCRIPT_METHOD(onEngineLoad)
-		{
-			v8::Isolate* isolate_ = args.GetIsolate();
-			v8::HandleScope handle_scope(isolate_);
-			v8::Local<v8::Context> context = isolate_->GetCurrentContext();
-			v8::Context::Scope context_scope(context);
-
-			if (args.Length() < 1)
-			{
-				// printf("Nein Nein Nein!\n");
-			}
-			else if (args[0]->IsFunction())
-			{
-				onLoadCallback_.Reset(isolate_, v8::Local<v8::Function>::Cast(args[0]));
-			}
-			args.GetReturnValue().Set(v8::Undefined(isolate_));
-		}
-
-		SCRIPT_METHOD(onEngineStart)
-		{
-			Logger::get()->info("on engine start called!");
-			if (args.Length() < 1)
-			{
-
-			}
-			else if (args.Length() > 1)
-			{
-
-			}
-			else if (!args[0]->IsString())
-			{
-
-			}
-			else
-			{
-				v8::Local<v8::String> str = args[0].As<v8::String>();
-				v8::String::Utf8Value sceneName = v8::String::Utf8Value(str);
-				engine->start(*sceneName);
-			}
-		}
-
-		SCRIPT_METHOD(onShowWindow)
-		{
-			engine->gameWindow.show();
-		}
-
-		SCRIPT_METHOD(onGetActiveScene)
-		{
-			v8::Local<v8::Object> scene = engine->sceneManager.activeScene()->jsScene(args.GetIsolate());
-			args.GetReturnValue().Set(scene);
-		}
-
-		static void globalInitializer(ScriptManager* manager, const v8::Local<v8::Object>& global)
-		{
-			using namespace v8;
-
-			Isolate* isolate = manager->isolate();
-			
-			auto globalObject = ScriptManager::ObjectBuilder(global, isolate);
-
-			auto engineObject = globalObject.newObject("Engine");
-			engineObject.set("onLoad", onEngineLoad);
-			engineObject.set("start", onEngineStart);
-			engineObject.set("log", log);
-			engineObject.set("getActiveScene", onGetActiveScene);
-
-			auto windowObj = engineObject.newObject("window");
-			windowObj.set("show", onShowWindow);
-
-			v8::Local<v8::Function> transformClass = manager->registerComponent<JsWrappers::JsTransform, Transform>("Transform");
-			v8::Local<v8::Function> gameObjectClass = manager->registerClass<JsWrappers::JsGameObject>("Transform");
-			v8::Local<v8::Function> sceneClass = manager->registerClass<JsWrappers::JsScene>("Scene");
-			
-			globalObject.set("Transform", transformClass);
-			globalObject.set("GameObject", gameObjectClass);
-			globalObject.set("Scene", sceneClass);
-
-		};
-	};
-#pragma endregion
-
 	char Engine::executablePath_[PATH_MAX];
 
 	Engine::Engine() : AbstractObject(),
-		subsystemTerminateOrder_(),
+		subsystemTerminateStack_(),
 		isRunning_(false),
+		configurePromiseResolver_(),
+		onLoadCallback_(),
+		configuredValue_(),
 		eventManager(this),
 		assetManager(this),
 		scriptManager(this),
@@ -166,7 +40,7 @@ namespace NovaEngine
 		}
 		else
 		{
-			subsystemTerminateOrder_.push(std::pair(name, dynamic_cast<Terminatable*>(subSystem)));
+			subsystemTerminateStack_.push(std::pair(name, dynamic_cast<Terminatable*>(subSystem)));
 			l->info(name, " initialized!");
 			return true;
 		}
@@ -177,7 +51,7 @@ namespace NovaEngine
 		Logger::get()->info("Initializing Engine...");
 
 		CHECK(initSubSystem("Asset manager", &assetManager, executablePath()), "Failed to initialize Asset Manager!");
-		CHECK(initSubSystem("Script Manager", &scriptManager, globalInitializer), "Failed to initialie Script Manager!");
+		CHECK(initSubSystem("Script Manager", &scriptManager), "Failed to initialie Script Manager!");
 
 		// the script should have setup a callback with Engine.onLoad([callback])
 		scriptManager.load(gameStartupScript == nullptr ? "Game.js" : gameStartupScript);
@@ -190,10 +64,10 @@ namespace NovaEngine
 
 		bool configInitialized = false;
 
-		// the script call Engine.onLoad() to provide a configure callback
+		// lets run the configure function
 		scriptManager.run([&](const ScriptManager::RunInfo& runInfo) {
 			v8::Local<v8::Object> recv = v8::Object::New(runInfo.isolate);
-			v8::Local<v8::Value> argv[] = { v8::Function::New(runInfo.isolate, onEngineConfigure) };
+			v8::Local<v8::Value> argv[] = { v8::Function::New(runInfo.isolate, JsWrappers::JsEngine::onConfigure) };
 			onLoadCallback_.Get(runInfo.isolate)->Call(recv, 1, argv)->ToObject(runInfo.isolate);
 		});
 
@@ -222,6 +96,21 @@ namespace NovaEngine
 		CHECK_REJECT(initSubSystem("Component Manager", &componentManager), rejectGameConfig, "Could not initialize Component Manager!");
 
 		return true;
+	}
+
+
+	void Engine::setOnLoadCallback(v8::Local<v8::Function> callback)
+	{
+		if (onLoadCallback_.IsEmpty())
+			onLoadCallback_.Reset(scriptManager.isolate(), callback);
+
+	}
+
+	void Engine::setConfigValue(v8::Local<v8::Object> config, v8::Local<v8::Promise::Resolver> resolver)
+	{
+		v8::Isolate* isolate = scriptManager.isolate();
+		configurePromiseResolver_.Reset(isolate, resolver);
+		configuredValue_.Reset(isolate, config);
 	}
 
 	const char* Engine::executablePath()
@@ -253,7 +142,7 @@ namespace NovaEngine
 	{
 		if (!configurePromiseResolver_.IsEmpty()) // probably first time started (with configuration passed) 
 		{
-			scriptManager.run([](const ScriptManager::RunInfo& runInfo) {
+			scriptManager.run([&](const ScriptManager::RunInfo& runInfo) {
 				configurePromiseResolver_.Get(runInfo.isolate)->Resolve(v8::Local<v8::Value>(v8::Undefined(runInfo.isolate)));
 			});
 			configurePromiseResolver_.Reset();
@@ -305,16 +194,11 @@ namespace NovaEngine
 		configurePromiseResolver_.Reset();
 		onLoadCallback_.Reset();
 		configuredValue_.Reset();
-		
-		// const size_t l = componentClassMap_.size();
 
-		// for(std::pair<const NovaEngine::BitMask::Type, v8::Global<v8::Function>>& global : componentClassMap_)
-		// 	global.second.Reset();
-
-		while (!subsystemTerminateOrder_.empty())
+		while (!subsystemTerminateStack_.empty())
 		{
-			std::pair<const char*, Terminatable*> p = subsystemTerminateOrder_.top();
-			subsystemTerminateOrder_.pop();
+			std::pair<const char*, Terminatable*> p = subsystemTerminateStack_.top();
+			subsystemTerminateStack_.pop();
 			p.second->terminate();
 			Logger::get()->info(p.first, " terminated!");
 		}

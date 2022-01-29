@@ -2,7 +2,6 @@
 
 #include "framework.hpp"
 #include "Entity.hpp"
-#include "ScriptManager.hpp"
 #include "Hash.hpp"
 
 namespace NovaEngine
@@ -33,8 +32,6 @@ namespace NovaEngine
 		void stop();
 
 		Entity* spawn(size_t n = 1);
-
-		CLASS_SCRIPT_METHOD(onSpawnGameObject);
 
 		v8::Local<v8::Object> jsScene(v8::Isolate* isolate);
 	};
