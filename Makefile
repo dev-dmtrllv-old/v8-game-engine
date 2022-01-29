@@ -88,7 +88,7 @@ out/assets/%.frag.spv: %.frag
 run:
 	@$(MAKE) test-game -j
 	@echo "-------- [ starting game ] --------\n"
-	@cd $(TEST_GAME_OUT) && DRI_PRIME=1 ./$(ENGINE_NAME) Game.js
+	@cd $(TEST_GAME_OUT) && ./$(ENGINE_NAME) Game.js
 	@echo "\n-------- [ game stopped ] --------"
 
 watch-ts:
@@ -107,9 +107,26 @@ clear:
 	$(MAKE) clean
 	clear
 
+
+
+ifeq ($(OS),Windows_NT)
+	@echo NOT IMPLEMENTED YET!
+else
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S),Linux)
+DOCKER_HOST_SETUP := xhost +
+DOCKER_CMD := docker run --device /dev/dri/ --rm -it --net=host --ipc=host -e DISPLAY=$$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix --volume="$$HOME/.Xauthority:/root/.Xauthority:rw" --volume="$$(pwd):/nova-engine:rw" nova-engine:latest
+    endif
+    ifeq ($(UNAME_S),Darwin)
+MAC_HOST_IP := $(shell ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')
+DOCKER_HOST_SETUP := xhost + $(MAC_HOST_IP) && \
+DOCKER_CMD := docker run --rm -it --net=host --ipc=host -d -e DISPLAY=$(MAC_HOST_IP):0 -v /tmp/.X11-unix:/tmp/.X11-unix --volume="$$(pwd):/nova-engine:rw" nova-engine:latest
+    endif
+endif
+
 build-container:
 	docker build -t nova-engine:latest .
 
 run-container:
-	xhost +
-	docker run --rm -it --net=host --ipc=host -e DISPLAY=$$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix --volume="$$HOME/.Xauthority:/root/.Xauthority:rw" --volume="$$(pwd):/nova-engine:rw" nova-engine:latest
+	sudo $(DOCKER_HOST_SETUP)
+	sudo $(DOCKER_CMD)
