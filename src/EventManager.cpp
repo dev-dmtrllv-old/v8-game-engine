@@ -24,11 +24,11 @@ namespace NovaEngine
 
 	bool EventManager::onInitialize()
 	{
-		return false;
+		return true;
 	}
 
 	bool EventManager::onTerminate()
 	{
-		return false;
+		return true;
 	}
 };

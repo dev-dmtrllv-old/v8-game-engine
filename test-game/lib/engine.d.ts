@@ -35,8 +35,6 @@ declare class GameObject
 {
 	public readonly name: string;
 
-	public get position(): Vector;
-
 	public get transform(): Transform;
 	
 	public constructor(name?: string, position?: Vector);

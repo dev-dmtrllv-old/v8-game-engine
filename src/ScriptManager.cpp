@@ -35,8 +35,8 @@ namespace NovaEngine
 
 	bool ScriptManager::onTerminate()
 	{
-		for (std::pair<const std::string, v8::Global<v8::Object>>& mod : modules_)
-			mod.second.Reset();
+		resetGlobalMap(registeredClasses_);
+		resetGlobalMap(modules_);
 
 		context_.Reset();
 		scriptManagerReference_.Reset();

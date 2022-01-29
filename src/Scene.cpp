@@ -15,47 +15,6 @@ namespace NovaEngine
 	{
 		jsScene_.Reset(isolate, jsScene);
 		jsScene->SetInternalField(0, v8::External::New(isolate, this));
-
-		ScriptManager::ClassBuilder goTemplate = ScriptManager::ClassBuilder(isolate, "GameObject", 2, [](V8CallbackArgs args) {
-			assert(args.Length() == 1);
-			assert(args[0]->IsArray());
-
-			v8::Isolate* isolate = args.GetIsolate();
-			v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
-
-			v8::Local<v8::Array> arguments = args[0].As<v8::Array>();
-
-			if (arguments->Length() == 0)
-			{
-
-			}
-			else
-			{
-				auto first = arguments->Get(0);
-
-				/**
-				 * arg options:
-				 * - (...) "empty"
-				 *  - (name: string)
-				 *  - (position: vector2 | vector3)
-				 * 	- (name: string, position: vector2 | vector3)
-				 */
-
-				if (first->IsString())
-				{
-					args.This()->Set(ctx, v8::String::NewFromUtf8(isolate, "name"), first);
-					if (arguments->Length() == 2)
-					{
-
-					}
-				}
-				else if (first->IsObject())
-				{
-					args.This()->Set(ctx, v8::String::NewFromUtf8(isolate, "name"), v8::String::NewFromUtf8(isolate, "Nameless GameObject"));
-				}
-			}
-		});
-		gameObjectTemplate_.Reset(isolate, goTemplate.build());
 	}
 
 	Engine* Scene::engine() { return engine_; }
@@ -108,7 +67,6 @@ namespace NovaEngine
 
 	SCRIPT_METHOD_IMPL(Scene, onSpawnGameObject)
 	{
-		v8::Isolate* isolate = args.GetIsolate();
 		Scene* scene = ScriptManager::getInternalFromArgs<Scene*>(args, 0);
 		assert(scene != nullptr);
 		Entity* entity = scene->spawn();

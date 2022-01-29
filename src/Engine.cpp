@@ -1,6 +1,10 @@
 #include "Engine.hpp"
 #include "Logger.hpp"
 #include "TransformSystem.hpp"
+#include "js_wrappers/JsClass.hpp"
+#include "js_wrappers/JsTransform.hpp"
+#include "js_wrappers/JsGameObject.hpp"
+#include "js_wrappers/JsScene.hpp"
 
 #define CHECK_REJECT(subSystem, rejector, msg) if(!subSystem) { rejector(msg); Logger::get()->error(#subSystem ":" #rejector " -> " msg); return false; }
 
@@ -15,7 +19,7 @@ namespace NovaEngine
 
 		SCRIPT_METHOD(onEngineConfigure)
 		{
-			v8::Isolate* isolate = args.GetIsolate();
+			// v8::Isolate* isolate = args.GetIsolate();
 
 			if (args.Length() < 1)
 			{
@@ -33,7 +37,6 @@ namespace NovaEngine
 
 		SCRIPT_METHOD(log)
 		{
-			v8::Isolate* isolate = args.GetIsolate();
 			std::string buf = "[Game]  ->  ";
 			for (int i = 0; i < args.Length(); i++)
 			{
@@ -104,33 +107,13 @@ namespace NovaEngine
 			args.GetReturnValue().Set(scene);
 		}
 
-		SCRIPT_METHOD(onAddComponent)
-		{
-			args.GetReturnValue().SetUndefined();
-		}
-
-		SCRIPT_METHOD(onGetComponent)
-		{
-			Entity* entity = ScriptManager::getInternalFromArgs<Entity*>(args, 1);
-			Transform* transform = engine->componentManager.getComponent<Transform>(entity);
-			if(transform == nullptr)
-				args.GetIsolate()->ThrowException(v8::String::NewFromUtf8(args.GetIsolate(), "Transform is nullptr!"));
-			args.GetReturnValue().Set(v8::String::NewFromUtf8(args.GetIsolate(), "Wooop you got a transform!"));
-		}
-
-		SCRIPT_METHOD(onRemoveComponent)
-		{
-			args.GetReturnValue().SetUndefined();
-		}
-
 		static void globalInitializer(ScriptManager* manager, const v8::Local<v8::Object>& global)
 		{
 			using namespace v8;
 
 			Isolate* isolate = manager->isolate();
-			Local<Context> ctx = isolate->GetCurrentContext();
-
-			auto globalObject = ScriptManager::ObjectBuilder(global, isolate, ctx);
+			
+			auto globalObject = ScriptManager::ObjectBuilder(global, isolate);
 
 			auto engineObject = globalObject.newObject("Engine");
 			engineObject.set("onLoad", onEngineLoad);
@@ -141,103 +124,14 @@ namespace NovaEngine
 			auto windowObj = engineObject.newObject("window");
 			windowObj.set("show", onShowWindow);
 
-			ScriptManager::ClassBuilder sceneClass = ScriptManager::ClassBuilder(isolate, "Scene", 1);
+			v8::Local<v8::Function> transformClass = manager->registerComponent<JsWrappers::JsTransform, Transform>("Transform");
+			v8::Local<v8::Function> gameObjectClass = manager->registerClass<JsWrappers::JsGameObject>("Transform");
+			v8::Local<v8::Function> sceneClass = manager->registerClass<JsWrappers::JsScene>("Scene");
+			
+			globalObject.set("Transform", transformClass);
+			globalObject.set("GameObject", gameObjectClass);
+			globalObject.set("Scene", sceneClass);
 
-			sceneClass.set("load", emptyFunction);
-			sceneClass.set("start", emptyFunction);
-			sceneClass.set("stop", emptyFunction);
-			sceneClass.set("spawn", Scene::onSpawnGameObject);
-
-			globalObject.set("Scene", sceneClass.build());
-
-			ScriptManager::ClassBuilder vector2Class = ScriptManager::ClassBuilder(isolate, "Vector", 0, [](V8CallbackArgs args) {
-				Isolate* isolate = args.GetIsolate();
-				Local<Context> ctx = isolate->GetCurrentContext();
-				Local<Object> this_ = args.This();
-
-				size_t l = args.Length();
-				if (l == 0)
-				{
-					this_->Set(ctx, String::NewFromUtf8(isolate, "x"), Number::New(isolate, 0));
-					this_->Set(ctx, String::NewFromUtf8(isolate, "y"), Number::New(isolate, 0));
-				}
-				else if (l == 1)
-				{
-					this_->Set(ctx, String::NewFromUtf8(isolate, "x"), args[0]->ToNumber(isolate));
-					this_->Set(ctx, String::NewFromUtf8(isolate, "y"), args[0]->ToNumber(isolate));
-				}
-				else if (l == 2)
-				{
-					this_->Set(ctx, String::NewFromUtf8(isolate, "x"), args[0]->ToNumber(isolate));
-					this_->Set(ctx, String::NewFromUtf8(isolate, "y"), args[1]->ToNumber(isolate));
-				}
-			});
-
-			globalObject.set("Vector2", vector2Class.build());
-
-			ScriptManager::ClassBuilder gameObjectClass = ScriptManager::ClassBuilder(isolate, "GameObject", 2, [](V8CallbackArgs args) {
-				Isolate* isolate = args.GetIsolate();
-				Engine* engine = static_cast<Engine*>(args.Data().As<v8::External>()->Value());
-				Scene* scene = engine->sceneManager.activeScene();
-
-				if (scene == nullptr)
-				{
-					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "There is no scene loaded!"));
-					Logger::get()->error("Trying to spawn a GameObject while the active scene is nullptr!");
-					return;
-				}
-
-				Local<Object> this_ = args.This();
-
-				Entity* e = scene->spawn();
-				this_->SetInternalField(0, External::New(isolate, scene));
-				this_->SetInternalField(1, External::New(isolate, e));
-
-				if (args.Length() == 0)
-				{
-
-				}
-				else if (args[0]->IsString())
-				{
-					this_->Set(isolate->GetCurrentContext(), v8::String::NewFromUtf8(isolate, "name"), args[0]);
-				}
-			}, manager->engine());
-
-			gameObjectClass.set("addComponent", onAddComponent);
-			gameObjectClass.set("getComponent", onGetComponent);
-			gameObjectClass.set("removeComponent", onRemoveComponent);
-
-			globalObject.set("GameObject", gameObjectClass.build());
-
-			ScriptManager::ClassBuilder transformClass = ScriptManager::ClassBuilder(isolate, "Transform", 2, [](V8CallbackArgs args) {
-				// Isolate* isolate = args.GetIsolate();
-				// Engine* engine = static_cast<Engine*>(args.Data().As<v8::External>()->Value());
-				// Scene* scene = engine->sceneManager.activeScene();
-
-				// if (scene == nullptr)
-				// {
-				// 	isolate->ThrowException(v8::String::NewFromUtf8(isolate, "There is no scene loaded!"));
-				// 	Logger::get()->error("Trying to spawn a GameObject while the active scene is nullptr!");
-				// 	return;
-				// }
-
-				// Local<Object> this_ = args.This();
-
-				// Entity* e = scene->spawn();
-				// this_->SetInternalField(0, External::New(isolate, scene));
-				// this_->SetInternalField(1, External::New(isolate, e));
-
-				// if (args.Length() == 0)
-				// {
-
-				// }
-				// else if (args[0]->IsString())
-				// {
-				// 	this_->Set(isolate->GetCurrentContext(), v8::String::NewFromUtf8(isolate, "name"), args[0]);
-				// }
-			}, manager->engine());
-
-			globalObject.set("Transform", transformClass.build());
 		};
 	};
 #pragma endregion
@@ -411,6 +305,11 @@ namespace NovaEngine
 		configurePromiseResolver_.Reset();
 		onLoadCallback_.Reset();
 		configuredValue_.Reset();
+		
+		// const size_t l = componentClassMap_.size();
+
+		// for(std::pair<const NovaEngine::BitMask::Type, v8::Global<v8::Function>>& global : componentClassMap_)
+		// 	global.second.Reset();
 
 		while (!subsystemTerminateOrder_.empty())
 		{

@@ -3,22 +3,29 @@
 #include "framework.hpp"
 #include "SubSystem.hpp"
 #include "Logger.hpp"
+#include "BitMask.hpp"
+#include "js_wrappers/JsClass.hpp"
+#include "Types.hpp"
+#include "Hash.hpp"
 
-#define CLASS_SCRIPT_METHOD(name) static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine); \
+#define CLASS_SCRIPT_METHOD(name) static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine, v8::Isolate* isolate); \
 static void name(const v8::FunctionCallbackInfo<v8::Value>& args) \
 { \
-	name ## _caller(args, ScriptManager::fetchEngineFromArgs(args));\
+	name ## _caller(args, ScriptManager::fetchEngineFromArgs(args), args.GetIsolate());\
 } \
 
-#define SCRIPT_METHOD(name) static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine); \
+#define SCRIPT_METHOD(name) static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine, v8::Isolate* isolate); \
 static void name(const v8::FunctionCallbackInfo<v8::Value>& args) \
 { \
-	name ## _caller(args, ScriptManager::fetchEngineFromArgs(args));\
+	name ## _caller(args, ScriptManager::fetchEngineFromArgs(args), args.GetIsolate());\
 } \
-static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine)
+static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine, v8::Isolate* isolate)
 
-#define SCRIPT_METHOD_IMPL(className, name) void className::name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine)
+#define SCRIPT_METHOD_IMPL(className, name) void className::name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine, v8::Isolate* isolate)
+#define COMPONENT_BIT_MASK_VALUE "__COMPONENT_BITMASK__"
 
+
+#define V8STR(str) v8::String::NewFromUtf8(isolate, str)
 
 typedef const v8::FunctionCallbackInfo<v8::Value>& CallbackArgs;
 
@@ -27,12 +34,6 @@ namespace NovaEngine
 	class ScriptManager;
 
 	typedef void(*ScriptManagerGlobalInitializer)(ScriptManager* manager, const v8::Local<v8::Object>&);
-
-	struct ScriptMethodInfo
-	{
-		const v8::FunctionCallbackInfo<v8::Value>& args;
-		Engine* engine;
-	};
 
 	class ScriptManager : public SubSystem<ScriptManagerGlobalInitializer>
 	{
@@ -65,7 +66,7 @@ namespace NovaEngine
 				callback(*keyVal, val);
 			}
 		}
-		
+
 		static inline void* getInternalFromArgs(V8CallbackArgs args, size_t field)
 		{
 			return args.This()->GetInternalField(field).As<v8::External>()->Value();
@@ -88,7 +89,9 @@ namespace NovaEngine
 			context_(),
 			scriptManagerReference_(),
 			modules_(),
-			moduleRequireCounter_(0)
+			moduleRequireCounter_(0),
+			registeredComponents_(),
+			registeredClasses_()
 		{}
 
 		static void onRequire(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -102,7 +105,17 @@ namespace NovaEngine
 		std::unordered_map<std::string, v8::Global<v8::Object>> modules_;
 		size_t moduleRequireCounter_;
 
+		std::unordered_map<Hash, v8::Global<v8::FunctionTemplate>*> registeredComponents_;
+		std::unordered_map<Hash, v8::Global<v8::FunctionTemplate>> registeredClasses_;
+
 		std::string getRelativePath(const std::string& str);
+
+		template<typename Key, typename Val>
+		inline void resetGlobalMap(std::unordered_map<Key, v8::Global<Val>>& map)
+		{
+			for (std::pair<const Key, v8::Global<Val>>& f : map)
+				f.second.Reset();
+		}
 
 	protected:
 		bool runScript(v8::Local<v8::Context> context, const char* scriptString);
@@ -144,6 +157,49 @@ namespace NovaEngine
 			}
 		}
 
+		template<Types::DerivedFrom<JsWrappers::JsClass> JsComponentClass, typename NativeComponent>
+		v8::Local<v8::Function> registerComponent(const char* name)
+		{
+			Hash nativeHash = Hasher::hash(typeid(NativeComponent).name());
+			Hash hash = Hasher::hash(typeid(JsComponentClass).name());
+
+			JsComponentClass c = JsComponentClass();
+
+			v8::Local<v8::FunctionTemplate> f = c.create(engine(), isolate(), name);
+			
+			registeredClasses_[hash].Reset(isolate(), f);
+			registeredComponents_[nativeHash] = &registeredClasses_[hash];
+
+			return registeredClasses_[hash].Get(isolate())->GetFunction();
+		}
+
+		template<Types::DerivedFrom<JsWrappers::JsClass> JsClassType>
+		v8::Local<v8::Function> registerClass(const char* name)
+		{
+			Hash hash = Hasher::hash(typeid(JsClassType).name());
+			JsClassType c = JsClassType();
+			v8::Local<v8::FunctionTemplate> f = c.create(engine(), isolate(), name);
+			registeredClasses_[hash].Reset(isolate(), f);
+
+			return registeredClasses_[hash].Get(isolate())->GetFunction();
+		}
+
+		template<Types::DerivedFrom<JsWrappers::JsClass> JsClassType>
+		v8::Local<v8::FunctionTemplate> getClass()
+		{
+			Hash hash = Hasher::hash(typeid(JsClassType).name());
+			assert(registeredClasses_.contains(hash));
+			return registeredClasses_[hash].Get(isolate());
+		}
+
+		template<typename ComponentType>
+		v8::Local<v8::FunctionTemplate> getComponentClass()
+		{
+			Hash hash = Hasher::hash(typeid(ComponentType).name());
+			assert(registeredComponents_.contains(hash));
+			return registeredComponents_[hash]->Get(isolate());
+		}
+
 	private:
 		void handleRequire(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -161,10 +217,10 @@ namespace NovaEngine
 			}
 
 		public:
-			ObjectBuilder(v8::Local<v8::Object> boundObject, v8::Isolate* isolate, v8::Local<v8::Context> ctx) :
+			ObjectBuilder(v8::Local<v8::Object> boundObject, v8::Isolate* isolate) :
 				boundObject(boundObject),
 				isolate(isolate),
-				ctx(ctx)
+				ctx(isolate->GetCurrentContext())
 			{}
 
 			ObjectBuilder& set(const char* name, int num)
@@ -220,89 +276,10 @@ namespace NovaEngine
 			{
 				v8::Local<v8::Object> o = v8::Object::New(isolate);
 				boundObject->Set(ctx, newString(name), o);
-				return ObjectBuilder(o, isolate, ctx);
-			}
-		};
-
-		class ClassBuilder
-		{
-		private:
-			static void onConstructCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
-				v8::Isolate* isolate = args.GetIsolate();
-				if (!args.IsConstructCall())
-					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "Cannot call constructor as function!"));
-			}
-
-			v8::Isolate* isolate;
-			v8::Local<v8::FunctionTemplate> funcTemp;
-			v8::Local<v8::ObjectTemplate> protoTemp;
-
-		public:
-			ClassBuilder(v8::Isolate* isolate, const char* name, size_t internalFieldCount = 0, void(*constructCallback)(V8CallbackArgs) = ClassBuilder::onConstructCallback, void* data = nullptr) : isolate(isolate), funcTemp(v8::FunctionTemplate::New(isolate))
-			{
-				funcTemp->SetCallHandler(constructCallback, v8::External::New(isolate, data));
-
-				if (name != nullptr)
-					funcTemp->SetClassName(v8::String::NewFromUtf8(isolate, name));
-
-				protoTemp = funcTemp->PrototypeTemplate();
-
-				if (internalFieldCount > 0)
-					setInternalFieldCount(internalFieldCount);
-			}
-
-			ClassBuilder& set(const char* name, int num)
-			{
-				protoTemp->Set(isolate, name, v8::Number::New(isolate, num));
-				return *this;
-			}
-
-			ClassBuilder& set(const char* name, unsigned int num)
-			{
-				protoTemp->Set(isolate, name, v8::Number::New(isolate, num));
-				return *this;
-			}
-
-			ClassBuilder& set(const char* name, float num)
-			{
-				protoTemp->Set(isolate, name, v8::Number::New(isolate, num));
-				return *this;
-			}
-
-			ClassBuilder& set(const char* name, double num)
-			{
-				protoTemp->Set(isolate, name, v8::Number::New(isolate, num));
-				return *this;
-			}
-
-			ClassBuilder& set(const char* name, const char* string)
-			{
-				protoTemp->Set(isolate, name, v8::String::NewFromUtf8(isolate, string, v8::NewStringType::kNormal).ToLocalChecked());
-				return *this;
-			}
-
-			ClassBuilder& set(const char* name, bool boolean)
-			{
-				protoTemp->Set(isolate, name, v8::Boolean::New(isolate, boolean));
-				return *this;
-			}
-
-			ClassBuilder& set(const char* name, v8::FunctionCallback func)
-			{
-				protoTemp->Set(isolate, name, v8::FunctionTemplate::New(isolate, func));
-				return *this;
-			}
-
-			ClassBuilder& setInternalFieldCount(size_t count)
-			{
-				funcTemp->InstanceTemplate()->SetInternalFieldCount(count);
-				return *this;
-			}
-
-			v8::Local<v8::Function> build()
-			{
-				return funcTemp->GetFunction();
+				return ObjectBuilder(o, isolate);
 			}
 		};
 	};
 }
+
+#undef COMPONENT_BIT_MASK_VALUE

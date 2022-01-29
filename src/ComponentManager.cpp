@@ -5,25 +5,8 @@
 
 namespace NovaEngine
 {
-	struct Test
-	{
-		float a;
-		float b;
-	};
-
-	class TestComponentSystem : public ComponentSystem<Test, Transform>
-	{
-	public:
-		TestComponentSystem(ComponentManager* manager) : ComponentSystem<Test, Transform>(manager) {}
-		~TestComponentSystem() {}
-
-		const char* name() { return "test component"; }
-		void update() {}
-	};
-
 	bool ComponentManager::onInitialize()
 	{
-		registerSystem<TestComponentSystem>();
 		registerSystem<TransformSystem>();
 		return true;
 	}
