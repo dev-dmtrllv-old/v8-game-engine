@@ -143,6 +143,12 @@ namespace NovaEngine
 			logFile_.close();
 	}
 
+	void Logger::logRest(char* str) 
+	{
+		printf("%s", str);
+		forward(str);
+	}
+
 	void Logger::logRest(const char* str) 
 	{
 		printf("%s", str);

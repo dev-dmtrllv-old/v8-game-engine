@@ -4,8 +4,21 @@
 #include "SubSystem.hpp"
 #include "Logger.hpp"
 
-#define SCRIPT_METHOD(name) static void name(const v8::FunctionCallbackInfo<v8::Value>& args)
-#define SCRIPT_METHOD_IMPL(className, name) void className::name(const v8::FunctionCallbackInfo<v8::Value>& args)
+#define CLASS_SCRIPT_METHOD(name) static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine); \
+static void name(const v8::FunctionCallbackInfo<v8::Value>& args) \
+{ \
+	name ## _caller(args, ScriptManager::fetchEngineFromArgs(args));\
+} \
+
+#define SCRIPT_METHOD(name) static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine); \
+static void name(const v8::FunctionCallbackInfo<v8::Value>& args) \
+{ \
+	name ## _caller(args, ScriptManager::fetchEngineFromArgs(args));\
+} \
+static void name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine)
+
+#define SCRIPT_METHOD_IMPL(className, name) void className::name ## _caller(const v8::FunctionCallbackInfo<v8::Value>& args, Engine* engine)
+
 
 typedef const v8::FunctionCallbackInfo<v8::Value>& CallbackArgs;
 
@@ -14,6 +27,12 @@ namespace NovaEngine
 	class ScriptManager;
 
 	typedef void(*ScriptManagerGlobalInitializer)(ScriptManager* manager, const v8::Local<v8::Object>&);
+
+	struct ScriptMethodInfo
+	{
+		const v8::FunctionCallbackInfo<v8::Value>& args;
+		Engine* engine;
+	};
 
 	class ScriptManager : public SubSystem<ScriptManagerGlobalInitializer>
 	{
@@ -45,6 +64,17 @@ namespace NovaEngine
 				Local<Value> val = obj->Get(ctx, key).ToLocalChecked();
 				callback(*keyVal, val);
 			}
+		}
+		
+		static inline void* getInternalFromArgs(V8CallbackArgs args, size_t field)
+		{
+			return args.This()->GetInternalField(field).As<v8::External>()->Value();
+		}
+
+		template<typename T>
+		static inline T getInternalFromArgs(V8CallbackArgs args, size_t field)
+		{
+			return static_cast<T>(getInternalFromArgs(args, field));
 		}
 
 		static Engine* fetchEngineFromArgs(const v8::FunctionCallbackInfo<v8::Value>& args);

@@ -38,10 +38,11 @@ namespace NovaEngine
 	bool SceneManager::loadScene(const char* sceneName)
 	{
 		Hash id = Hasher::hash(sceneName);
+		
 		if(scenes_.contains(id))
 		{
-			scenes_[id]->load();
 			activeScene_ = scenes_[id];
+			scenes_[id]->load();
 			return true;
 		}
 

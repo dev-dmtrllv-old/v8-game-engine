@@ -26,7 +26,7 @@ namespace NovaEngine
 		Vector2& operator-=(Vector2& next) { x -= next.x; y -= next.y; return *this; }
 		Vector2& operator*=(Vector2& next) { x *= next.x; y *= next.y; return *this; }
 		Vector2& operator/=(Vector2& next) { x /= next.x; y /= next.y; return *this; }
-	};
+	} PACKED;
 
 	struct Vector3
 	{
@@ -50,5 +50,5 @@ namespace NovaEngine
 		Vector3& operator-=(Vector3& next) { x -= next.x; y -= next.y; z -= next.z; return *this; }
 		Vector3& operator*=(Vector3& next) { x *= next.x; y *= next.y; z *= next.z; return *this; }
 		Vector3& operator/=(Vector3& next) { x /= next.x; y /= next.y; z /= next.z; return *this; }
-	};
+	} PACKED;
 };

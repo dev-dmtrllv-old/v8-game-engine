@@ -14,6 +14,11 @@ namespace NovaEngine
 			return bitMask & (1 << bitIndex);
 		}
 
+		constexpr static const bool contains(BitMask::Type bitMask, BitMask::Type other)
+		{
+			return !(~bitMask & other);
+		}
+
 		class Generator
 		{
 		private:

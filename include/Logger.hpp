@@ -55,6 +55,7 @@ namespace NovaEngine
 		};
 
 	private:
+		void logRest(char* str);
 		void logRest(const char* str);
 		void logRest(std::string& str);
 

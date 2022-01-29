@@ -87,8 +87,6 @@ namespace NovaEngine
 			}
 			else
 			{
-				Engine* engine = ScriptManager::fetchEngineFromArgs(args);
-
 				v8::Local<v8::String> str = args[0].As<v8::String>();
 				v8::String::Utf8Value sceneName = v8::String::Utf8Value(str);
 				engine->start(*sceneName);
@@ -97,14 +95,32 @@ namespace NovaEngine
 
 		SCRIPT_METHOD(onShowWindow)
 		{
-			Engine* engine = ScriptManager::fetchEngineFromArgs(args);
 			engine->gameWindow.show();
 		}
 
 		SCRIPT_METHOD(onGetActiveScene)
 		{
-			Logger::get()->info("GET ACTIVE SCENE!!!!!!!!!!!!!!!!!!!!!!");
-			args.GetReturnValue().SetNull();
+			v8::Local<v8::Object> scene = engine->sceneManager.activeScene()->jsScene(args.GetIsolate());
+			args.GetReturnValue().Set(scene);
+		}
+
+		SCRIPT_METHOD(onAddComponent)
+		{
+			args.GetReturnValue().SetUndefined();
+		}
+
+		SCRIPT_METHOD(onGetComponent)
+		{
+			Entity* entity = ScriptManager::getInternalFromArgs<Entity*>(args, 1);
+			Transform* transform = engine->componentManager.getComponent<Transform>(entity);
+			if(transform == nullptr)
+				args.GetIsolate()->ThrowException(v8::String::NewFromUtf8(args.GetIsolate(), "Transform is nullptr!"));
+			args.GetReturnValue().Set(v8::String::NewFromUtf8(args.GetIsolate(), "Wooop you got a transform!"));
+		}
+
+		SCRIPT_METHOD(onRemoveComponent)
+		{
+			args.GetReturnValue().SetUndefined();
 		}
 
 		static void globalInitializer(ScriptManager* manager, const v8::Local<v8::Object>& global)
@@ -163,18 +179,65 @@ namespace NovaEngine
 				Isolate* isolate = args.GetIsolate();
 				Engine* engine = static_cast<Engine*>(args.Data().As<v8::External>()->Value());
 				Scene* scene = engine->sceneManager.activeScene();
-			
+
+				if (scene == nullptr)
+				{
+					isolate->ThrowException(v8::String::NewFromUtf8(isolate, "There is no scene loaded!"));
+					Logger::get()->error("Trying to spawn a GameObject while the active scene is nullptr!");
+					return;
+				}
+
 				Local<Object> this_ = args.This();
 
-				if (scene != nullptr)
+				Entity* e = scene->spawn();
+				this_->SetInternalField(0, External::New(isolate, scene));
+				this_->SetInternalField(1, External::New(isolate, e));
+
+				if (args.Length() == 0)
 				{
-					Entity* e = scene->spawn();
-					this_->SetInternalField(0, External::New(isolate, scene));
-					this_->SetInternalField(1, External::New(isolate, e));
+
+				}
+				else if (args[0]->IsString())
+				{
+					this_->Set(isolate->GetCurrentContext(), v8::String::NewFromUtf8(isolate, "name"), args[0]);
 				}
 			}, manager->engine());
 
+			gameObjectClass.set("addComponent", onAddComponent);
+			gameObjectClass.set("getComponent", onGetComponent);
+			gameObjectClass.set("removeComponent", onRemoveComponent);
+
 			globalObject.set("GameObject", gameObjectClass.build());
+
+			ScriptManager::ClassBuilder transformClass = ScriptManager::ClassBuilder(isolate, "Transform", 2, [](V8CallbackArgs args) {
+				// Isolate* isolate = args.GetIsolate();
+				// Engine* engine = static_cast<Engine*>(args.Data().As<v8::External>()->Value());
+				// Scene* scene = engine->sceneManager.activeScene();
+
+				// if (scene == nullptr)
+				// {
+				// 	isolate->ThrowException(v8::String::NewFromUtf8(isolate, "There is no scene loaded!"));
+				// 	Logger::get()->error("Trying to spawn a GameObject while the active scene is nullptr!");
+				// 	return;
+				// }
+
+				// Local<Object> this_ = args.This();
+
+				// Entity* e = scene->spawn();
+				// this_->SetInternalField(0, External::New(isolate, scene));
+				// this_->SetInternalField(1, External::New(isolate, e));
+
+				// if (args.Length() == 0)
+				// {
+
+				// }
+				// else if (args[0]->IsString())
+				// {
+				// 	this_->Set(isolate->GetCurrentContext(), v8::String::NewFromUtf8(isolate, "name"), args[0]);
+				// }
+			}, manager->engine());
+
+			globalObject.set("Transform", transformClass.build());
 		};
 	};
 #pragma endregion
@@ -323,12 +386,8 @@ namespace NovaEngine
 
 			sceneManager.loadScene(startSceneName);
 
-			// TransformSystem* ts = componentManager.getSystem<TransformSystem>();
-
-			// ts->update();
-
 			JobSystem::JobInfo jobs[1] = {
-				{ WindowManager::pollEvents }
+				{ WindowManager::pollEvents },
 			};
 
 			jobScheduler.runJobs(jobs, 1, true);

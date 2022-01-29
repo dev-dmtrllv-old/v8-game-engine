@@ -24,7 +24,7 @@ namespace NovaEngine
 			v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
 			v8::Local<v8::Array> arguments = args[0].As<v8::Array>();
-			
+
 			if (arguments->Length() == 0)
 			{
 
@@ -44,9 +44,9 @@ namespace NovaEngine
 				if (first->IsString())
 				{
 					args.This()->Set(ctx, v8::String::NewFromUtf8(isolate, "name"), first);
-					if(arguments->Length() == 2)
+					if (arguments->Length() == 2)
 					{
-						
+
 					}
 				}
 				else if (first->IsObject())
@@ -80,8 +80,15 @@ namespace NovaEngine
 		if (!this->jsScene_.IsEmpty())
 		{
 			engine_->scriptManager.run([&](const ScriptManager::RunInfo& info) {
+				v8::TryCatch tryCatch = v8::TryCatch(info.isolate);
 				auto s = jsScene_.Get(info.isolate);
 				s->Get(v8::String::NewFromUtf8(info.isolate, methodName)).As<v8::Function>()->Call(s, 0, nullptr);
+				if (tryCatch.HasCaught())
+				{
+					v8::Local<v8::String> str = tryCatch.Exception()->ToString(info.isolate);
+					v8::String::Utf8Value val = v8::String::Utf8Value(str);
+					Logger::get()->error("Got exception ", *val);
+				}
 			});
 		}
 	}
@@ -94,6 +101,7 @@ namespace NovaEngine
 		for (size_t i = 0; i < n; i++)
 		{
 			entities_.push_back(entityCounter_++);
+			engine_->componentManager.addComponent<Transform>(&entities_.at(index + i));
 		}
 		return &entities_[index];
 	}
@@ -101,11 +109,9 @@ namespace NovaEngine
 	SCRIPT_METHOD_IMPL(Scene, onSpawnGameObject)
 	{
 		v8::Isolate* isolate = args.GetIsolate();
-		Engine* engine = ScriptManager::fetchEngineFromArgs(args);
-		Scene* scene = static_cast<Scene*>(args.This()->GetInternalField(0).As<v8::External>()->Value());
+		Scene* scene = ScriptManager::getInternalFromArgs<Scene*>(args, 0);
 		assert(scene != nullptr);
 		Entity* entity = scene->spawn();
-		engine->componentManager.addComponent<Transform>(entity);
 		const size_t l = args.Length();
 		v8::Local<v8::Array> argsList = v8::Array::New(isolate, l);
 		for (size_t i = 0; i < l; i++)
@@ -116,5 +122,10 @@ namespace NovaEngine
 		go.As<v8::Object>()->SetInternalField(0, v8::External::New(isolate, scene));
 		go.As<v8::Object>()->SetInternalField(1, v8::External::New(isolate, entity));
 		args.GetReturnValue().Set(go);
+	}
+
+	v8::Local<v8::Object> Scene::jsScene(v8::Isolate* isolate)
+	{
+		return jsScene_.Get(isolate);
 	}
 };

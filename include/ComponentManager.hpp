@@ -47,8 +47,18 @@ namespace NovaEngine
 	class ComponentManager : public SubSystem<>
 	{
 	private:
+		struct EntityComponentInfo
+		{
+			const BitMask::Type bitMask;
+			void* componentPtr;
+			EntityComponentInfo(BitMask::Type bitMask, void* componentPtr): bitMask(bitMask), componentPtr(componentPtr) {}
+			template<typename T>
+			EntityComponentInfo(BitMask::Type bitMask, T* componentPtr): bitMask(bitMask), componentPtr(static_cast<void*>(componentPtr)) {}
+		};
+
 		std::unordered_map<Hash, IComponentSystem*> systems_;
 		std::unordered_map<Hash, BitMask::Type> componentToBitmask_;
+		std::unordered_map<Entity*, std::vector<EntityComponentInfo>> componentEntityMap_;
 		BitMask::Generator bitMaskGenerator_;
 
 	public:
@@ -62,6 +72,12 @@ namespace NovaEngine
 		bool onTerminate();
 
 		void registerSystem(Hash name, IComponentSystem* componentSystem);
+
+		template<typename T>
+		Hash componentSystemToHash()
+		{
+			return Hasher::hash(typeid(T).name());
+		}
 
 		template<typename T>
 		Hash componentToHash()
@@ -98,17 +114,46 @@ namespace NovaEngine
 		template<typename T>
 		T* addComponent(Entity* entity)
 		{
+			const BitMask::Type bitMask = componentToBitMask<T>();
 			if (entity->componentsBitMask == 0)
-				entity->componentsBitMask = componentToBitMask<T>();
+				entity->componentsBitMask = bitMask;
 			else
-				entity->componentsBitMask |= componentToBitMask<T>();
-			
-			for (const std::pair<const Entity::IDCounter, IComponentSystem*> p : systems_)
-				if (p.second->bitMask & ~entity->componentsBitMask)
+				entity->componentsBitMask |= bitMask;
+
+			for (const std::pair<Hash, IComponentSystem*> p : systems_)
+				if (BitMask::contains(entity->componentsBitMask, p.second->bitMask))
 					p.second->addEntitiy(entity);
 			
-			return new T();
+			if(!componentEntityMap_.contains(entity))
+				componentEntityMap_.emplace(entity, std::vector<EntityComponentInfo>());
+
+			T* component = new T();
+
+			componentEntityMap_[entity].push_back(EntityComponentInfo(bitMask, component));
+
+			return component;
 		}
+
+		template<typename T>
+		T* getComponent(Entity* entity, const BitMask::Type bitMask)
+		{
+			if(componentEntityMap_.contains(entity))
+			{
+				const std::vector<EntityComponentInfo> list = componentEntityMap_[entity];
+				for(const EntityComponentInfo& info : list)
+					if(info.bitMask == bitMask)
+						return static_cast<T*>(info.componentPtr);
+			}
+			
+			return nullptr;
+		}
+
+		template<typename T>
+		T* getComponent(Entity* entity)
+		{
+			return getComponent<T>(entity, getComponentBitMask<T>());
+		}
+
 
 		template<typename ...Ts>
 		BitMask::Type getComponentBitMask()
@@ -128,6 +173,14 @@ namespace NovaEngine
 				mask += componentToBitmask_[hash];
 			}
 			return mask;
+		}
+
+		template<Types::DerivedFrom<IComponentSystem> T>
+		T* getSystem()
+		{
+			Hash h = componentSystemToHash<T>();
+			assert(systems_.contains(h));
+			return static_cast<T*>(systems_[h]);
 		}
 	};
 

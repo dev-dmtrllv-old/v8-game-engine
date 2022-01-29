@@ -56,6 +56,8 @@
 #define ON_DEBUG(expr)
 #endif
 
+#define PACKED __attribute__((packed))
+
 #pragma endregion
 
 using V8CallbackArgs = const v8::FunctionCallbackInfo<v8::Value>&;

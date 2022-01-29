@@ -34,6 +34,8 @@ namespace NovaEngine
 
 		Entity* spawn(size_t n = 1);
 
-		SCRIPT_METHOD(onSpawnGameObject);
+		CLASS_SCRIPT_METHOD(onSpawnGameObject);
+
+		v8::Local<v8::Object> jsScene(v8::Isolate* isolate);
 	};
 };

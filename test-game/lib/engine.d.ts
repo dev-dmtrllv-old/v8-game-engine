@@ -10,19 +10,40 @@ declare class Window
  */
 declare class Vector
 {
+	public get x(): number;
+	public get y(): number;
+	public get z(): number;
+
 	public constructor();
 }
 
-/**
- * TODO: implement on c++ side
- */
+declare class Component
+{
+	public readonly gameObject: GameObject;
+}
+
+type ComponentType<T extends Component> = new (...args: any[]) => T;
+
+declare class Transform extends Component
+{
+	public get position(): Vector;
+	public get scale(): Vector;
+	public get rotation(): Vector;
+}
+
 declare class GameObject
 {
 	public readonly name: string;
 
 	public get position(): Vector;
+
+	public get transform(): Transform;
 	
 	public constructor(name?: string, position?: Vector);
+
+	public addComponent<T extends Component>(component: ComponentType<T>): T;
+	public getComponent<T extends Component>(component: ComponentType<T>): T;
+	public removeComponent<T extends Component>(component: T): boolean;
 }
 
 declare abstract class Scene
