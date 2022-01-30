@@ -20,7 +20,7 @@
 		"noImplicitUseStrict": true,
 		"alwaysStrict": false,
 		"types": [],
-		"target": "ES6",
+		"target": "ESNext",
 		"module": "CommonJS",
 		"moduleResolution": "Node",
 		"allowSyntheticDefaultImports": true,
