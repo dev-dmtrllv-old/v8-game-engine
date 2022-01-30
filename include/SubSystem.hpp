@@ -5,7 +5,6 @@
 #define ENGINE_SUB_SYSTEM_CTOR(name) friend class NovaEngine::Engine; \
 name(Engine* engine) : SubSystem(engine)
 
-
 namespace NovaEngine
 {
 	class Engine;
@@ -61,10 +60,10 @@ namespace NovaEngine
 
 	protected:
 		SubSystem(Engine* engine) : engine_(engine) {}
-		
+
 		virtual bool onInitialize() = 0;
 		virtual bool onTerminate() = 0;
-
+		
 	private:
 
 		bool initialize()

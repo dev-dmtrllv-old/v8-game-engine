@@ -31,6 +31,15 @@ namespace NovaEngine
 			initializeGlobal(info.context->Global());
 		});
 
+		engine()->eventManager.on(Hasher::hash("componentRegistered"), [](EventManager::EventData& e)
+		{
+			Hash h = reinterpret_cast<Hash>(e.data);
+			e.engine->scriptManager.run([&](const RunInfo& info)
+			{
+				std::cout << "component registered with hash " << h << std::endl;
+			});
+		});
+
 		return true;
 	}
 

@@ -84,6 +84,8 @@ namespace NovaEngine
 			configInitialized = initSubSystem("Config Manager", &configManager, &configuredValue_);
 
 		CHECK_REJECT(configInitialized, rejectGameConfig, "Could not initialize Config Manager!");
+		
+		CHECK_REJECT(initSubSystem("Component Manager", &componentManager), rejectGameConfig, "Could not initialize Component Manager!");
 
 		CHECK_REJECT(initSubSystem("Window Manager", &windowManager), rejectGameConfig, "Could not initialize Window Manager!");
 
@@ -93,7 +95,6 @@ namespace NovaEngine
 
 		CHECK_REJECT(initSubSystem("Scene Manager", &sceneManager), rejectGameConfig, "Could not initialize Scene Manager!");
 
-		CHECK_REJECT(initSubSystem("Component Manager", &componentManager), rejectGameConfig, "Could not initialize Component Manager!");
 
 		return true;
 	}

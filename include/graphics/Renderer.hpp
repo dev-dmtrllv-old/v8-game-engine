@@ -1,24 +1,23 @@
 #pragma once
 
-#include "AbstractObject.hpp"
 #include "GameWindow.hpp"
+#include "ComponentManager.hpp"
 
 namespace NovaEngine::Graphics
 {
 	class Context;
 
-	class Renderer : public AbstractObject<>
+	template<typename... Ts>
+	class Renderer : public ComponentSystem<Ts...>
 	{
 		private:
 			GameWindow* window_;
 
 		public:
-			Renderer(GameWindow* window) : AbstractObject(), window_(window) {}
+			Renderer(ComponentManager* manager, GameWindow* window) : ComponentSystem<Ts...>(manager), window_(window) {}
 
 		protected:
 			bool onInitialize();
 			bool onTerminate();
-
-			virtual void render();
 	};
 };

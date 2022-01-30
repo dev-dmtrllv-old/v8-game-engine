@@ -44,6 +44,17 @@ namespace NovaEngine
 	template<typename... Ts>
 	class ComponentSystem;
 
+	class ComponentAllocator
+	{
+	public:
+		const size_t size;
+		
+		ComponentAllocator(const size_t size) : size(size) {}
+		
+		void* alloc() { return ::malloc(size); }
+		void free(void* ptr) { ::free(ptr); }
+	};
+
 	class ComponentManager : public SubSystem<>
 	{
 	private:
@@ -59,12 +70,18 @@ namespace NovaEngine
 		std::unordered_map<Hash, IComponentSystem*> systems_;
 		std::unordered_map<Hash, BitMask::Type> componentToBitmask_;
 		std::unordered_map<Entity*, std::vector<EntityComponentInfo>> componentEntityMap_;
+		std::unordered_map<Hash, ComponentAllocator*> componentAllocators_;
 
 		BitMask::Generator bitMaskGenerator_;
+
+		void emitComponentRegistered(Hash hash);
 
 	public:
 		ENGINE_SUB_SYSTEM_CTOR(ComponentManager),
 			systems_(),
+			componentToBitmask_(),
+			componentEntityMap_(),
+			componentAllocators_(),
 			bitMaskGenerator_()
 		{}
 
@@ -98,6 +115,17 @@ namespace NovaEngine
 			return static_cast<T*>(systems_[hash]);
 		}
 
+		template<Types::DerivedFrom<IComponentSystem> T, typename... Args>
+		T* registerSystem(Args... args)
+		{
+			const Hash hash = Hasher::hash(typeid(T).name());
+
+			if (!systems_.contains(hash))
+				registerSystem(hash, new T(this, args...));
+
+			return static_cast<T*>(systems_[hash]);
+		}
+
 		template<typename T>
 		T* addComponent(Entity* entity)
 		{
@@ -121,15 +149,14 @@ namespace NovaEngine
 			return component;
 		}
 
-		template<typename T>
-		T* getComponent(Entity* entity, const BitMask::Type bitMask)
+		void* getComponent(Entity* entity, const BitMask::Type bitMask)
 		{
 			if (componentEntityMap_.contains(entity))
 			{
 				const std::vector<EntityComponentInfo>& list = componentEntityMap_[entity];
 				for (const EntityComponentInfo& info : list)
 					if (info.bitMask == bitMask)
-						return static_cast<T*>(info.componentPtr);
+						return info.componentPtr;
 			}
 
 			return nullptr;
@@ -138,7 +165,7 @@ namespace NovaEngine
 		template<typename T>
 		T* getComponent(Entity* entity)
 		{
-			return getComponent<T>(entity, getComponentBitMask<T>());
+			return static_cast<T*>(getComponent(entity, getComponentBitMask<T>()));
 		}
 
 		template<typename ...Ts>
@@ -146,15 +173,32 @@ namespace NovaEngine
 		{
 			std::vector<const char*> names = std::vector<const char*>();
 			names.insert(names.end(), { typeid(Ts).name()... });
+
+			std::vector<size_t> sizes = std::vector<size_t>();
+			sizes.insert(sizes.end(), { sizeof(Ts)... });
+
+			size_t i = 0;
+
 			BitMask::Type mask = 0;
 			for (const char* id : names)
 			{
 				Hash hash = Hasher::hash(id);
 				if (!componentToBitmask_.contains(hash))
+				{
 					componentToBitmask_.emplace(hash, bitMaskGenerator_.generate());
+					componentAllocators_.emplace(hash, new ComponentAllocator(sizes[i]));
+					std::cout << "register " << id << std::endl;
+					emitComponentRegistered(hash);
+				}
 				mask |= componentToBitmask_[hash];
+				i++;
 			}
 			return mask;
+		}
+
+		ComponentAllocator* getAllocator(Hash hash)
+		{
+			return componentAllocators_[hash];
 		}
 
 		template<Types::DerivedFrom<IComponentSystem> T>
