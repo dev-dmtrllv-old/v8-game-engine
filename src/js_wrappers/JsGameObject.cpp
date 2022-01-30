@@ -4,28 +4,41 @@
 #include "Scene.hpp"
 #include "ScriptManager.hpp"
 #include "Entity.hpp"
+#include "Logger.hpp"
 
 namespace NovaEngine::JsWrappers
 {
 	JS_METHOD_IMPL(JsGameObject, addComponent)
 	{
-		// Entity* entity = ScriptManager::getInternalFromArgs<Entity*>(args, 1);
-		// BitMask::Type bitMask = ScriptManager::getComponentBitMask(args.GetIsolate(), args[0]);
+		Entity* entity = ScriptManager::getInternalFromArgs<Entity*>(args, 1);
+		Hash hash = ScriptManager::getComponentHash(args);
+		BitMask::Type bitMask = engine->componentManager.getComponentBitMask(hash);
 
-		// if (bitMask != 0)
-		// {
-		// 	void* component = engine->componentManager.getComponent<void*>(entity, bitMask);
+		if (bitMask != 0)
+		{
+			void* component = engine->componentManager.addComponent(entity, bitMask);
 
-		// 	if (component != nullptr)
-		// 	{
-		// 		auto v = componentClassMap_[bitMask].Get(args.GetIsolate());
-		// 		args.GetReturnValue().Set(v->CallAsConstructor(args.GetIsolate()->GetCurrentContext(), 0, nullptr).ToLocalChecked());
-		// 	}
-		// }
-		// else
-		// {
+			if (component != nullptr)
+			{
+				v8::Local<v8::Object> o = args[0].As<v8::Function>()->CallAsConstructor(isolate->GetCurrentContext(), 0, nullptr).ToLocalChecked().As<v8::Object>();
+				size_t index = o->InternalFieldCount();
+				if(index >= 2)
+					index -= 2;
+				o->SetInternalField(index, v8::External::New(isolate, entity));
+				o->SetInternalField(index + 1, v8::External::New(isolate, component));
+				args.GetReturnValue().Set(o);
+			}
+			else
+			{
+				Logger::get()->error("Could not get component!");
+			}
+		}
+		else
+		{
+			std::string s = std::to_string(hash);
+			Logger::get()->error("Bitmask is 0 for hash ", s.c_str());
 			args.GetReturnValue().SetUndefined();
-		// }
+		}
 	}
 
 	JS_METHOD_IMPL(JsGameObject, getComponent)

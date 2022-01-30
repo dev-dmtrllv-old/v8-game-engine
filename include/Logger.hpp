@@ -59,6 +59,13 @@ namespace NovaEngine
 		void logRest(const char* str);
 		void logRest(std::string& str);
 
+		template<typename T>
+		void logRest(T& other)
+		{
+			std::string s = std::to_string(other);
+			logRest(s);
+		}
+
 		template<typename T, typename... Rest>
 		void logRest(T str, Rest... rest)
 		{

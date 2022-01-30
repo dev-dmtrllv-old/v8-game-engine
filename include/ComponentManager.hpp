@@ -48,9 +48,9 @@ namespace NovaEngine
 	{
 	public:
 		const size_t size;
-		
+
 		ComponentAllocator(const size_t size) : size(size) {}
-		
+
 		void* alloc() { return ::malloc(size); }
 		void free(void* ptr) { ::free(ptr); }
 	};
@@ -70,7 +70,8 @@ namespace NovaEngine
 		std::unordered_map<Hash, IComponentSystem*> systems_;
 		std::unordered_map<Hash, BitMask::Type> componentToBitmask_;
 		std::unordered_map<Entity*, std::vector<EntityComponentInfo>> componentEntityMap_;
-		std::unordered_map<Hash, ComponentAllocator*> componentAllocators_;
+		std::unordered_map<BitMask::Type, ComponentAllocator*> componentAllocators_;
+		std::unordered_map<BitMask::Type, std::vector<IComponentSystem*>> bitMaskToSystems_;
 
 		BitMask::Generator bitMaskGenerator_;
 
@@ -82,6 +83,7 @@ namespace NovaEngine
 			componentToBitmask_(),
 			componentEntityMap_(),
 			componentAllocators_(),
+			bitMaskToSystems_(),
 			bitMaskGenerator_()
 		{}
 
@@ -95,7 +97,12 @@ namespace NovaEngine
 		template<typename T>
 		const BitMask::Type getComponentBitMask()
 		{
-			return componentToBitmask_[Hasher::hash(typeid(T).name())];
+			return getComponentBitMask(Hasher::hash(typeid(T).name()));
+		}
+
+		const BitMask::Type getComponentBitMask(Hash hash)
+		{
+			return componentToBitmask_[hash];
 		}
 
 		template<typename T>
@@ -126,34 +133,22 @@ namespace NovaEngine
 			return static_cast<T*>(systems_[hash]);
 		}
 
+		void* addComponent(Entity* entity, BitMask::Type bitMask);
+
 		template<typename T>
 		T* addComponent(Entity* entity)
 		{
 			const BitMask::Type bitMask = getComponentBitMask<T>();
-			if (entity->componentsBitMask == 0)
-				entity->componentsBitMask = bitMask;
-			else
-				entity->componentsBitMask |= bitMask;
-
-			for (const std::pair<Hash, IComponentSystem*> p : systems_)
-				if (BitMask::contains(entity->componentsBitMask, p.second->bitMask))
-					p.second->addEntitiy(entity);
-
-			if (!componentEntityMap_.contains(entity))
-				componentEntityMap_.emplace(entity, std::vector<EntityComponentInfo>());
-
-			T* component = new T();
-
-			componentEntityMap_[entity].push_back(EntityComponentInfo(bitMask, component));
-
-			return component;
+			return static_cast<T*>(addComponent(entity, bitMask));
 		}
+
 
 		void* getComponent(Entity* entity, const BitMask::Type bitMask)
 		{
 			if (componentEntityMap_.contains(entity))
 			{
 				const std::vector<EntityComponentInfo>& list = componentEntityMap_[entity];
+
 				for (const EntityComponentInfo& info : list)
 					if (info.bitMask == bitMask)
 						return info.componentPtr;
@@ -162,14 +157,8 @@ namespace NovaEngine
 			return nullptr;
 		}
 
-		template<typename T>
-		T* getComponent(Entity* entity)
-		{
-			return static_cast<T*>(getComponent(entity, getComponentBitMask<T>()));
-		}
-
 		template<typename ...Ts>
-		BitMask::Type registerComponents()
+		BitMask::Type registerComponents(IComponentSystem* componentSystem)
 		{
 			std::vector<const char*> names = std::vector<const char*>();
 			names.insert(names.end(), { typeid(Ts).name()... });
@@ -185,9 +174,17 @@ namespace NovaEngine
 				Hash hash = Hasher::hash(id);
 				if (!componentToBitmask_.contains(hash))
 				{
-					componentToBitmask_.emplace(hash, bitMaskGenerator_.generate());
-					componentAllocators_.emplace(hash, new ComponentAllocator(sizes[i]));
-					std::cout << "register " << id << std::endl;
+					BitMask::Type bitMask = bitMaskGenerator_.generate();
+					componentToBitmask_.emplace(hash, bitMask);
+					componentAllocators_.emplace(bitMask, new ComponentAllocator(sizes[i]));
+					
+					if(!bitMaskToSystems_.contains(bitMask))
+						bitMaskToSystems_.emplace(bitMask, std::vector<IComponentSystem*>());
+
+					bitMaskToSystems_[bitMask].push_back(componentSystem);
+
+					Logger::get()->info("register ", hash, " id ", id, " bitMask ", bitMask);
+					
 					emitComponentRegistered(hash);
 				}
 				mask |= componentToBitmask_[hash];
@@ -196,9 +193,9 @@ namespace NovaEngine
 			return mask;
 		}
 
-		ComponentAllocator* getAllocator(Hash hash)
+		ComponentAllocator* getAllocator(BitMask::Type bitMask)
 		{
-			return componentAllocators_[hash];
+			return componentAllocators_[bitMask];
 		}
 
 		template<Types::DerivedFrom<IComponentSystem> T>
@@ -214,7 +211,7 @@ namespace NovaEngine
 	class ComponentSystem : public IComponentSystem
 	{
 	public:
-		ComponentSystem(ComponentManager* manager) : IComponentSystem(manager, manager->registerComponents<Ts...>()) {};
+		ComponentSystem(ComponentManager* manager) : IComponentSystem(manager, manager->registerComponents<Ts...>(this)) {};
 		virtual ~ComponentSystem() = default;
 
 		virtual const char* name() = 0;

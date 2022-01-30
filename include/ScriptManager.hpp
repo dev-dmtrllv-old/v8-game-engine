@@ -8,8 +8,6 @@
 #include "Types.hpp"
 #include "Hash.hpp"
 
-#define COMPONENT_BIT_MASK_VALUE "__COMPONENT_BITMASK__"
-
 #define V8STR(str) v8::String::NewFromUtf8(isolate, str)
 
 typedef const v8::FunctionCallbackInfo<v8::Value>& CallbackArgs;
@@ -64,6 +62,7 @@ namespace NovaEngine
 		static Engine* fetchEngineFromArgs(const v8::FunctionCallbackInfo<v8::Value>& args);
 		static Engine* fetchEngineFromArgs(const v8::PropertyCallbackInfo<v8::Value>& args);
 		static Engine* fetchEngineFromArgs(const v8::PropertyCallbackInfo<void>& args);
+		static BitMask::Type getComponentHash(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static void printObject(v8::Isolate* isolate, const v8::Local<v8::Value>& o, const char* name = nullptr);
 		static v8::Local<v8::String> objectToString(v8::Isolate* isolate, const v8::Local<v8::Value>& o);
@@ -74,6 +73,7 @@ namespace NovaEngine
 			isolate_(nullptr),
 			context_(),
 			scriptManagerReference_(),
+			componentHashSymbol_(),
 			modules_(),
 			moduleRequireCounter_(0),
 			registeredComponents_(),
@@ -88,6 +88,7 @@ namespace NovaEngine
 		v8::Isolate* isolate_;
 		v8::Global<v8::Context> context_;
 		v8::Global<v8::Number> scriptManagerReference_;
+		v8::Global<v8::Private> componentHashSymbol_;
 		std::unordered_map<std::string, v8::Global<v8::Object>> modules_;
 		size_t moduleRequireCounter_;
 
@@ -96,6 +97,8 @@ namespace NovaEngine
 
 		std::string getRelativePath(const std::string& str);
 
+		v8::Local<v8::Private> getComponentHashSymbol();
+		
 		template<typename Key, typename Val>
 		inline void resetGlobalMap(std::unordered_map<Key, v8::Global<Val>>& map)
 		{
@@ -157,6 +160,10 @@ namespace NovaEngine
 
 			registeredClasses_[hash].Reset(isolate(), f);
 			registeredComponents_[nativeHash] = &registeredClasses_[hash];
+			
+			
+			const size_t count = (*f)->InstanceTemplate()->InternalFieldCount() + 2;
+			(*f)->InstanceTemplate()->SetInternalFieldCount(count);
 
 			return registeredClasses_[hash].Get(isolate())->GetFunction();
 		}
@@ -184,9 +191,10 @@ namespace NovaEngine
 		v8::Local<v8::FunctionTemplate> getComponentClass()
 		{
 			Hash hash = Hasher::hash(typeid(ComponentType).name());
-			assert(registeredComponents_.contains(hash));
-			return registeredComponents_[hash]->Get(isolate());
+			return getComponentClass(hash);
 		}
+
+		v8::Local<v8::FunctionTemplate> getComponentClass(Hash hash);
 
 	private:
 		void handleRequire(const v8::FunctionCallbackInfo<v8::Value>& args);

@@ -23,7 +23,7 @@ namespace NovaEngine
 
 			v8::Local<v8::ObjectTemplate> global = v8::ObjectTemplate::New(isolate_);
 			v8::Local<v8::Context> context = v8::Context::New(isolate_, NULL, global);
-
+			componentHashSymbol_.Reset(isolate_, v8::Private::New(isolate_, v8::String::NewFromUtf8(isolate_, "__COMPONENT_BITMASK__")));
 			context_.Reset(isolate_, context);
 		}
 
@@ -31,12 +31,12 @@ namespace NovaEngine
 			initializeGlobal(info.context->Global());
 		});
 
-		engine()->eventManager.on(Hasher::hash("componentRegistered"), [](EventManager::EventData& e)
-		{
-			Hash h = reinterpret_cast<Hash>(e.data);
-			e.engine->scriptManager.run([&](const RunInfo& info)
-			{
-				std::cout << "component registered with hash " << h << std::endl;
+		engine()->eventManager.on(Hasher::hash("componentRegistered"), [](EventManager::EventData& e) {
+			Hash hash = reinterpret_cast<Hash>(e.data);
+			e.engine->scriptManager.run([&](const RunInfo& info) {
+				v8::Local<v8::Function> componentClass = info.scriptManager->getComponentClass(hash)->GetFunction();
+				componentClass->SetPrivate(info.context, info.scriptManager->getComponentHashSymbol(), v8::External::New(info.isolate, reinterpret_cast<void*>(hash)));
+				std::cout << "component registered with hash " << hash << std::endl;
 			});
 		});
 
@@ -48,6 +48,7 @@ namespace NovaEngine
 		resetGlobalMap(registeredClasses_);
 		resetGlobalMap(modules_);
 
+		componentHashSymbol_.Reset();
 		context_.Reset();
 		scriptManagerReference_.Reset();
 
@@ -263,9 +264,28 @@ namespace NovaEngine
 		return static_cast<Engine*>(args.GetIsolate()->GetData(0));
 	}
 
+	Hash ScriptManager::getComponentHash(const v8::FunctionCallbackInfo<v8::Value>& args)
+	{
+		Engine* engine = fetchEngineFromArgs(args);
+		v8::Local<v8::Value> val = args[0].As<v8::Object>()->GetPrivate(args.GetIsolate()->GetCurrentContext(), engine->scriptManager.getComponentHashSymbol()).ToLocalChecked();
+		Hash bitMask = reinterpret_cast<Hash>(val.As<v8::External>()->Value());
+		return bitMask;
+	}
+
 	v8::Local<v8::String> ScriptManager::objectToString(v8::Isolate* isolate, const v8::Local<v8::Value>& o)
 	{
 		return v8::JSON::Stringify(isolate->GetCurrentContext(), o).ToLocalChecked();
+	}
+
+	v8::Local<v8::FunctionTemplate> ScriptManager::getComponentClass(Hash hash)
+	{
+		assert(registeredComponents_.contains(hash));
+		return registeredComponents_[hash]->Get(isolate());
+	}
+
+	v8::Local<v8::Private> ScriptManager::getComponentHashSymbol()
+	{
+		return componentHashSymbol_.Get(isolate());
 	}
 
 	void ScriptManager::printObject(v8::Isolate* isolate, const v8::Local<v8::Value>& o, const char* name)
@@ -338,4 +358,5 @@ namespace NovaEngine
 			puts("}");
 		}
 	}
+
 };
