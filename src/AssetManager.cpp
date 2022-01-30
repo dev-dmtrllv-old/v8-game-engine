@@ -15,7 +15,6 @@ namespace NovaEngine
 		return true;
 	}
 
-
 	bool AssetManager::loadFile(const char* assetPath, std::vector<char>& fileContents)
 	{
 		if (!fileExists(assetPath))

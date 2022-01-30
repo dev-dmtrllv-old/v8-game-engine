@@ -2,6 +2,7 @@
 #include "Engine.hpp"
 #include "js_wrappers/Wrappers.hpp"
 #include "Transform.hpp"
+#include "SpriteRenderer.hpp"
 
 namespace NovaEngine
 {
@@ -9,7 +10,7 @@ namespace NovaEngine
 
 	bool ScriptManager::onInitialize()
 	{
-		platform_ = v8::platform::NewDefaultPlatform();
+		platform_ = v8::platform::NewDefaultPlatform(1);
 		v8::V8::InitializePlatform(platform_.get());
 		v8::V8::Initialize();
 
@@ -55,19 +56,25 @@ namespace NovaEngine
 	void ScriptManager::initializeGlobal(v8::Local<v8::Object> globalObj)
 	{
 		using namespace JsWrappers;
+		using Func = v8::Local<v8::Function>;
 
 		JsWrappers::JsObject::Builder global = JsWrappers::JsObject::Builder(globalObj, isolate());
 
 		global.set("require", v8::Function::New(isolate_, onRequire, scriptManagerReference_.Get(isolate_)));
 		global.set<JsEngine>("Engine");
+		global.set<JsAssetManager>("AssetManager");
 
-		v8::Local<v8::Function> transformClass = registerComponent<JsWrappers::JsTransform, Transform>("Transform");
-		v8::Local<v8::Function> gameObjectClass = registerClass<JsWrappers::JsGameObject>("Transform");
-		v8::Local<v8::Function> sceneClass = registerClass<JsWrappers::JsScene>("Scene");
+		Func transformClass = registerComponent<JsWrappers::JsTransform, Transform>("Transform");
+		Func spriteRendererClass = registerComponent<JsWrappers::JsSpriteRenderer, SpriteRenderer>("SpriteRenderer");
+		Func gameObjectClass = registerClass<JsWrappers::JsGameObject>("GameObject");
+		Func sceneClass = registerClass<JsWrappers::JsScene>("Scene");
+		Func assetClass = registerClass<JsWrappers::JsAsset>("Asset");
 
 		global.set("Transform", transformClass);
+		global.set("SpriteRenderer", spriteRendererClass);
 		global.set("GameObject", gameObjectClass);
 		global.set("Scene", sceneClass);
+		global.set("Asset", assetClass);
 	}
 
 	v8::Isolate* ScriptManager::isolate() { return isolate_; }
@@ -105,7 +112,7 @@ namespace NovaEngine
 
 		if (args.Length() < 1)
 		{
-			
+
 		}
 		else if (args[0]->IsString())
 		{
@@ -235,6 +242,21 @@ namespace NovaEngine
 	Engine* ScriptManager::fetchEngineFromArgs(const v8::FunctionCallbackInfo<v8::Value>& args)
 	{
 		return static_cast<Engine*>(args.GetIsolate()->GetData(0));
+	}
+
+	Engine* ScriptManager::fetchEngineFromArgs(const v8::PropertyCallbackInfo<v8::Value>& args)
+	{
+		return static_cast<Engine*>(args.GetIsolate()->GetData(0));
+	}
+
+	Engine* ScriptManager::fetchEngineFromArgs(const v8::PropertyCallbackInfo<void>& args)
+	{
+		return static_cast<Engine*>(args.GetIsolate()->GetData(0));
+	}
+
+	v8::Local<v8::String> ScriptManager::objectToString(v8::Isolate* isolate, const v8::Local<v8::Value>& o)
+	{
+		return v8::JSON::Stringify(isolate->GetCurrentContext(), o).ToLocalChecked();
 	}
 
 	void ScriptManager::printObject(v8::Isolate* isolate, const v8::Local<v8::Value>& o, const char* name)

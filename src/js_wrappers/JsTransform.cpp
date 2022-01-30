@@ -6,42 +6,47 @@ namespace NovaEngine
 {
 	namespace JsWrappers
 	{
-		JS_METHOD_IMPL(JsTransform, getPosition)
+		JS_METHOD_IMPL(JsTransform, ctor)
+		{
+			
+		}
+
+		JS_GETTER_IMPL(JsTransform, position)
 		{
 
 		}
-		
-		JS_METHOD_IMPL(JsTransform, setPosition)
+
+		JS_SETTER_IMPL(JsTransform, position)
 		{
 
 		}
-		
-		JS_METHOD_IMPL(JsTransform, getRotation)
+
+		JS_GETTER_IMPL(JsTransform, rotation)
 		{
 
 		}
-		
-		JS_METHOD_IMPL(JsTransform, setRotation)
+
+		JS_SETTER_IMPL(JsTransform, rotation)
 		{
 
 		}
-		
-		JS_METHOD_IMPL(JsTransform, getScale)
+
+		JS_GETTER_IMPL(JsTransform, scale)
 		{
 
 		}
-		
-		JS_METHOD_IMPL(JsTransform, setScale)
+
+		JS_SETTER_IMPL(JsTransform, scale)
 		{
 
 		}
-		
+
 		void JsTransform::build(Engine* engine, JsClass::Builder& builder)
 		{
-			builder.setConstructor([](V8CallbackArgs args) 
-			{
-				
-			});
+			builder.setConstructor(ctor);
+			builder.setAccessors("position", getposition, setposition);
+			builder.setAccessors("rotation", getrotation, setrotation);
+			builder.setAccessors("scale", getscale, setscale);
 		}
 	};
 };

@@ -98,6 +98,12 @@ namespace NovaEngine
 					return *this;
 				}
 
+				Builder& setAccessors(const char* name, v8::AccessorGetterCallback getter, v8::AccessorSetterCallback setter)
+				{
+					protoTemp->SetAccessor(v8::String::NewFromUtf8(isolate, name), getter, setter);
+					return *this;
+				}
+
 				Builder& setInternalFieldCount(size_t count)
 				{
 					funcTemp->InstanceTemplate()->SetInternalFieldCount(count);

@@ -53,9 +53,23 @@ namespace NovaEngine
 			std::string buf = "[Game]  ->  ";
 			for (int i = 0; i < args.Length(); i++)
 			{
-				auto a = args[i]->ToString(isolate);
-				v8::String::Utf8Value val(a);
-				buf += *val;
+				if (args[i]->IsObject() || args[i]->IsArray())
+				{
+					v8::Local<v8::String> type = args[i]->ToObject(isolate)->GetConstructorName();
+					v8::Local<v8::String> str = ScriptManager::objectToString(isolate, args[i]);
+					v8::String::Utf8Value val(str);
+					v8::String::Utf8Value typeVal(type);
+					buf += *typeVal;
+					buf += " ";
+					buf += *val;
+				}
+				else
+				{
+					v8::Local<v8::String> str = args[i]->ToString(isolate);
+					v8::String::Utf8Value val(str);
+					buf += *val;
+				}
+
 				if (i != args.Length() - 1)
 					buf += ", ";
 			}

@@ -7,3 +7,6 @@
 #include "js_wrappers/JsScene.hpp"
 #include "js_wrappers/JsEngine.hpp"
 #include "js_wrappers/JsWindow.hpp"
+#include "js_wrappers/JsAssetManager.hpp"
+#include "js_wrappers/JsSpriteRenderer.hpp"
+#include "js_wrappers/JsAsset.hpp"

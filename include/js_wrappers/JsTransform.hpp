@@ -9,12 +9,14 @@ namespace NovaEngine
 	{
 		class JsTransform : public JsClass
 		{
-			JS_METHOD(getPosition);
-			JS_METHOD(setPosition);
-			JS_METHOD(getRotation);
-			JS_METHOD(setRotation);
-			JS_METHOD(getScale);
-			JS_METHOD(setScale);
+			JS_METHOD(ctor);
+
+			JS_GETTER(position);
+			JS_SETTER(position);
+			JS_GETTER(rotation);
+			JS_SETTER(rotation);
+			JS_GETTER(scale);
+			JS_SETTER(scale);
 
 			virtual void build(Engine* engine, JsClass::Builder& builder);
 		};

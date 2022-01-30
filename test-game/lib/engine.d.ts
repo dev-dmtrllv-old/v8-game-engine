@@ -22,6 +22,18 @@ declare class Component
 	public readonly gameObject: GameObject;
 }
 
+declare module "*.png"
+{
+	const path: string;
+	export default path;
+}
+
+declare module "*.jpg"
+{
+	const path: string;
+	export default path;
+}
+
 type ComponentType<T extends Component> = new (...args: any[]) => T;
 
 declare class Transform extends Component
@@ -31,12 +43,17 @@ declare class Transform extends Component
 	public get rotation(): Vector;
 }
 
+declare class SpriteRenderer extends Component
+{
+	public set sprite(asset: Asset<SPRITE>);
+}
+
 declare class GameObject
 {
 	public readonly name: string;
 
 	public get transform(): Transform;
-	
+
 	public constructor(name?: string, position?: Vector);
 
 	public addComponent<T extends Component>(component: ComponentType<T>): T;
@@ -120,6 +137,47 @@ declare namespace Engine
 	 * @returns Scene or null if no scene is loaded.
 	 */
 	const getActiveScene: () => Scene | null;
+
+}
+
+type UnwrapPromise<T> = T extends Promise<infer P> ? P extends Promise<any> ? UnwrapPromise<P> : P : T;
+
+declare type AUDIO = "AUDIO";
+declare type SPRITE = "SPRITE";
+
+declare type AssetTypes = AUDIO | SPRITE;
+
+declare interface IAssetData
+{
+	get data(): Uint32Array;
+}
+
+declare class AudioData implements IAssetData
+{
+	get data(): Uint32Array;
+	private constructor();
+}
+
+declare class SpriteData implements IAssetData
+{
+	get data(): Uint32Array;
+	private constructor();
+}
+
+declare type AssetDataFromType<T> = T extends AUDIO ? AudioData : T extends SPRITE ? SpriteData : IAssetData;
+
+declare class Asset<T = AssetTypes>
+{
+	public readonly type: T;
+
+	private constructor();
+
+	public get(): AssetDataFromType<T>;
+}
+
+declare namespace AssetManager
+{
+	const load: <T extends AssetTypes>(path: string) => Asset<T>;
 }
 
 type OnLoadCallback = (configure: EngineConfigureFunction) => void;

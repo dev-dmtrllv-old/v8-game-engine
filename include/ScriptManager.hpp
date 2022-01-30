@@ -62,8 +62,11 @@ namespace NovaEngine
 		}
 
 		static Engine* fetchEngineFromArgs(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static Engine* fetchEngineFromArgs(const v8::PropertyCallbackInfo<v8::Value>& args);
+		static Engine* fetchEngineFromArgs(const v8::PropertyCallbackInfo<void>& args);
 
 		static void printObject(v8::Isolate* isolate, const v8::Local<v8::Value>& o, const char* name = nullptr);
+		static v8::Local<v8::String> objectToString(v8::Isolate* isolate, const v8::Local<v8::Value>& o);
 
 	private:
 		ENGINE_SUB_SYSTEM_CTOR(ScriptManager),
