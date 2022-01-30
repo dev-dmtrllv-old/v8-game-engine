@@ -22,7 +22,7 @@ namespace NovaEngine::JsWrappers
 			{
 				v8::Local<v8::Object> o = args[0].As<v8::Function>()->CallAsConstructor(isolate->GetCurrentContext(), 0, nullptr).ToLocalChecked().As<v8::Object>();
 				size_t index = o->InternalFieldCount();
-				if(index >= 2)
+				if (index >= 2)
 					index -= 2;
 				o->SetInternalField(index, v8::External::New(isolate, entity));
 				o->SetInternalField(index + 1, v8::External::New(isolate, component));
@@ -43,7 +43,35 @@ namespace NovaEngine::JsWrappers
 
 	JS_METHOD_IMPL(JsGameObject, getComponent)
 	{
+		Entity* entity = ScriptManager::getInternalFromArgs<Entity*>(args, 1);
+		Hash hash = ScriptManager::getComponentHash(args);
+		BitMask::Type bitMask = engine->componentManager.getComponentBitMask(hash);
 
+		if (bitMask != 0)
+		{
+			void* component = engine->componentManager.getComponent(entity, bitMask);
+
+			if (component != nullptr)
+			{
+				v8::Local<v8::Object> o = args[0].As<v8::Function>()->CallAsConstructor(isolate->GetCurrentContext(), 0, nullptr).ToLocalChecked().As<v8::Object>();
+				size_t index = o->InternalFieldCount();
+				if (index >= 2)
+					index -= 2;
+				o->SetInternalField(index, v8::External::New(isolate, entity));
+				o->SetInternalField(index + 1, v8::External::New(isolate, component));
+				args.GetReturnValue().Set(o);
+			}
+			else
+			{
+				Logger::get()->error("Could not get component!");
+			}
+		}
+		else
+		{
+			std::string s = std::to_string(hash);
+			Logger::get()->error("Bitmask is 0 for hash ", s.c_str());
+			args.GetReturnValue().SetUndefined();
+		}
 	}
 
 	JS_METHOD_IMPL(JsGameObject, removeComponent)

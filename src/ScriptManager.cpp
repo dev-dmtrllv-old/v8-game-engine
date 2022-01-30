@@ -36,7 +36,6 @@ namespace NovaEngine
 			e.engine->scriptManager.run([&](const RunInfo& info) {
 				v8::Local<v8::Function> componentClass = info.scriptManager->getComponentClass(hash)->GetFunction();
 				componentClass->SetPrivate(info.context, info.scriptManager->getComponentHashSymbol(), v8::External::New(info.isolate, reinterpret_cast<void*>(hash)));
-				std::cout << "component registered with hash " << hash << std::endl;
 			});
 		});
 

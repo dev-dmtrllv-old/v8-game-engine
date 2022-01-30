@@ -4,8 +4,10 @@ export class TestScene extends Scene
 	{
 		const gameObject = new GameObject("hyaaaaa!");
 		
-		const spriteRenderer = gameObject.addComponent(SpriteRenderer);
+		gameObject.addComponent(SpriteRenderer);
 		
+		const spriteRenderer = gameObject.getComponent(SpriteRenderer);
+
 		Engine.log(spriteRenderer);
 
 		let sprite = AssetManager.load("../assets/sprites/test.jpg");
