@@ -58,7 +58,7 @@ namespace NovaEngine
 
 		if (onLoadCallback_.IsEmpty())
 		{
-			Logger::get()->error("Startup Script did not provide a Engine.onload callback!");
+			Logger::get()->error("Startup Script did not provide an Engine.onload callback!");
 			return false;
 		}
 
@@ -84,7 +84,7 @@ namespace NovaEngine
 			configInitialized = initSubSystem("Config Manager", &configManager, &configuredValue_);
 
 		CHECK_REJECT(configInitialized, rejectGameConfig, "Could not initialize Config Manager!");
-		
+
 		CHECK_REJECT(initSubSystem("Component Manager", &componentManager), rejectGameConfig, "Could not initialize Component Manager!");
 
 		CHECK_REJECT(initSubSystem("Window Manager", &windowManager), rejectGameConfig, "Could not initialize Window Manager!");
@@ -155,6 +155,87 @@ namespace NovaEngine
 		return isRunning_;
 	}
 
+	std::atomic<size_t> n = 0;
+
+	JOB(test_loop)
+	{
+		std::cout << "test-loop" << std::endl;
+		std::this_thread::sleep_for(std::chrono::milliseconds(333));
+		scheduler->runJob(test_loop);
+		JOB_RETURN;
+	}
+
+	JOB(test4)
+	{
+		puts("f");
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		JOB_RETURN;
+	}
+
+	JOB(test3)
+	{
+		puts("x");
+		JOB_RETURN;
+	}
+
+	JOB(test2)
+	{
+		using namespace JobSystem;
+
+		puts("x");
+
+		JobInfo jobs[5] = {
+			{ test4 },
+			{ test4 },
+			{ test4 },
+			{ test4 },
+			{ test4 }
+		};
+
+		scheduler->runJobs(jobs, 5);
+
+		JobInfo jobs2[5] = {
+			{ test3 },
+			{ test3 },
+			{ test3 },
+			{ test3 },
+			{ test3 }
+		};
+
+		Counter* c = scheduler->runJobs(jobs2, 5);
+
+		awaitCounter(c);
+
+		puts("done2");
+
+		JOB_RETURN;
+	}
+
+	JOB(test)
+	{
+		using namespace JobSystem;
+
+		JobInfo jobs[5] = {
+			{ test2 },
+			{ test2 },
+			{ test2 },
+			{ test2 },
+			{ test2 }
+		};
+
+		Counter* c = scheduler->runJobs(jobs, 5);
+
+		awaitCounter(c);
+
+		puts("done");
+		
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+
+		scheduler->runJob(test);
+
+		JOB_RETURN;
+	}
+
 	void Engine::start(const char* startSceneName)
 	{
 		if (!isRunning_)
@@ -175,6 +256,13 @@ namespace NovaEngine
 			};
 
 			jobScheduler.runJobs(jobs, 1, true);
+
+			JobSystem::JobInfo wokerJobs[2] = {
+				{ test },
+				{ test_loop }
+			};
+
+			jobScheduler.runJobs(wokerJobs, 2, false);
 
 			jobScheduler.exec([&] { return isRunning_; });
 

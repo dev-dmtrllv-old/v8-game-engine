@@ -35,17 +35,19 @@ namespace NovaEngine::JobSystem
 	{
 	private:
 		size_t maxJobs_;
-		Queue<JobHandle> readyQueue_;
-		Queue<JobHandle> mainThreadQueue_;
+		Queue<JobHandle>* readyQueue_;
+		Queue<JobHandle>* mainThreadQueue_;
 		List<JobHandle> waitList_;
 		List<JobHandle> mainThreadWaitList_;
-		std::mutex jobYieldMutex_;
-		std::mutex mainThreadJobYieldMutex_;
+		// std::mutex jobYieldMutex_;
+		// std::mutex mainThreadJobYieldMutex_;
 
 		std::vector<std::thread> threads_;
 		std::thread::id mainThreadID_;
 		std::atomic<int> threadsRunning_;
 		size_t executionThreads_;
+
+		std::unordered_map<std::thread::id, size_t> threadIdMap_;
 
 		bool isRunning_;
 
@@ -55,11 +57,12 @@ namespace NovaEngine::JobSystem
 			mainThreadQueue_(),
 			waitList_(),
 			mainThreadWaitList_(),
-			jobYieldMutex_(),
+			// jobYieldMutex_(),
 			threads_(),
 			mainThreadID_(std::this_thread::get_id()),
 			threadsRunning_(),
 			executionThreads_(1),
+			threadIdMap_(),
 			isRunning_(false)
 		{
 			threadsRunning_.store(0);
@@ -78,6 +81,8 @@ namespace NovaEngine::JobSystem
 		Counter* runJobs(JobInfo* jobs, size_t jobsCount, bool mainThreadOnly = false);
 		Counter* runJob(JobInfo jobs, bool mainThreadOnly = false);
 		Counter* runJob(JobFunction func, bool mainThreadOnly = false);
+
+		size_t getThreadID();
 
 		void joinThreads();
 
@@ -118,7 +123,7 @@ namespace NovaEngine::JobSystem
 			while (shouldLoop())
 			{
 				if(runNextMainThreadJob(&jobHandle))
-					handleJobYield(&jobHandle);
+					handleMainThreadJobYield(&jobHandle);
 				
 				if (shouldLoop() && runNextJob(&jobHandle))
 					handleJobYield(&jobHandle);

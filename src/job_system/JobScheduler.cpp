@@ -4,13 +4,14 @@
 
 namespace NovaEngine::JobSystem
 {
-	static std::atomic<size_t> threadIdCounter = 0;
-
 	bool JobScheduler::onInitialize()
 	{
 		JobSystemConfig& config = engine()->configManager.getJobSystemConfig();
 		maxJobs_ = config.maxJobs == 0 ? DefaultConfig::JobSystem::maxJobs : config.maxJobs;
 		executionThreads_ = (config.executionThreads == 0 ? std::thread::hardware_concurrency() : config.executionThreads) - 1;
+		threadIdMap_.emplace(std::this_thread::get_id(), 0);
+		readyQueue_ = new Queue<JobHandle>(maxJobs_);
+		mainThreadQueue_ = new Queue<JobHandle>(maxJobs_);
 		return true;
 	}
 
@@ -41,7 +42,7 @@ namespace NovaEngine::JobSystem
 
 	bool JobScheduler::runNextJob(JobHandlePtr handleOut)
 	{
-		if (readyQueue_.pop(handleOut))
+		if (readyQueue_->try_pop(*handleOut))
 		{
 			if (handleOut != nullptr && !handleOut->done())
 			{
@@ -56,7 +57,7 @@ namespace NovaEngine::JobSystem
 
 	bool JobScheduler::runNextMainThreadJob(JobHandlePtr handleOut)
 	{
-		if (mainThreadQueue_.pop(handleOut))
+		if (mainThreadQueue_->try_pop(*handleOut))
 		{
 			if (handleOut != nullptr && !handleOut->done())
 			{
@@ -72,7 +73,7 @@ namespace NovaEngine::JobSystem
 		Counter* c = new Counter(0);
 		c->store(jobsCount, std::memory_order::relaxed);
 
-		Queue<JobHandle>* targetQueue = mainThreadOnly ? &mainThreadQueue_ : &readyQueue_;
+		Queue<JobHandle>* targetQueue = mainThreadOnly ? mainThreadQueue_ : readyQueue_;
 
 		for (size_t i = 0; i < jobsCount; i++)
 			targetQueue->push(jobs[i].function(c, this, this->engine(), jobs[i].arg));
@@ -109,11 +110,19 @@ namespace NovaEngine::JobSystem
 		threads_.clear();
 	}
 
+	size_t JobScheduler::getThreadID()
+	{
+		return threadIdMap_[std::this_thread::get_id()];
+	}
+
 	void JobScheduler::initThreads()
 	{
 		if (threads_.size() == 0)
 			for (size_t i = 0; i < executionThreads_; i++)
-				threads_.push_back(std::thread([&] { threadEntry(threadIdCounter.fetch_add(1, std::memory_order::acq_rel)); }));
+			{
+				threads_.push_back(std::thread([&] { threadEntry(i + 1); }));
+				threadIdMap_.emplace(threads_[i].get_id(), i + 1); 
+			}
 	}
 
 	bool JobScheduler::handleJobYield(JobHandlePtr handle)
@@ -124,8 +133,6 @@ namespace NovaEngine::JobSystem
 		}
 		else
 		{
-			std::unique_lock<std::mutex> s(jobYieldMutex_);
-
 			auto [counter, isDone] = handle->promise().state;
 
 			if (!isDone)
@@ -133,7 +140,7 @@ namespace NovaEngine::JobSystem
 				size_t c = counter->load(std::memory_order::seq_cst);
 				if (c == 0)
 				{
-					readyQueue_.push(*handle);
+					readyQueue_->push(*handle);
 				}
 				else
 				{
@@ -142,7 +149,7 @@ namespace NovaEngine::JobSystem
 						c = counter->load(std::memory_order::seq_cst);
 						if (c == 0)
 						{
-							readyQueue_.push(*handle);
+							readyQueue_->push(*handle);
 							return true;
 						}
 					}
@@ -157,7 +164,7 @@ namespace NovaEngine::JobSystem
 					waitList_.findAndRelease([&](JobHandle handle) {
 						if (handle.promise().state.counter == counter)
 						{
-							readyQueue_.push(handle);
+							readyQueue_->push(handle);
 							return true;
 						}
 						return false;
@@ -186,7 +193,7 @@ namespace NovaEngine::JobSystem
 				size_t c = counter->load(std::memory_order::acquire);
 				if (c == 0)
 				{
-					mainThreadQueue_.push(*handle);
+					mainThreadQueue_->push(*handle);
 				}
 				else
 				{
@@ -195,7 +202,7 @@ namespace NovaEngine::JobSystem
 						c = counter->load(std::memory_order::acquire);
 						if (c == 0)
 						{
-							mainThreadQueue_.push(*handle);
+							mainThreadQueue_->push(*handle);
 							return true;
 						}
 					}
@@ -210,7 +217,7 @@ namespace NovaEngine::JobSystem
 					mainThreadWaitList_.findAndRelease([&](JobHandle handle) {
 						if (handle.promise().state.counter == counter)
 						{
-							mainThreadQueue_.push(handle);
+							mainThreadQueue_->push(handle);
 							return true;
 						}
 						return false;
