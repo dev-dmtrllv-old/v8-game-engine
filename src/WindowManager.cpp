@@ -4,7 +4,7 @@
 
 namespace NovaEngine
 {
-	STATIC_JOB(WindowManager, pollEvents)
+	JOB(WindowManager::pollEvents)
 	{
 		glfwPollEvents();
 		scheduler->runJob(pollEvents, true);

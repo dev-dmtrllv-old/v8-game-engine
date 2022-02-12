@@ -204,7 +204,7 @@ namespace NovaEngine
 
 		Counter* c = scheduler->runJobs(jobs2, 5);
 
-		awaitCounter(c);
+		JOB_AWAIT(c);
 
 		puts("done2");
 
@@ -225,7 +225,7 @@ namespace NovaEngine
 
 		Counter* c = scheduler->runJobs(jobs, 5);
 
-		awaitCounter(c);
+		JOB_AWAIT(c);
 
 		puts("done");
 		

@@ -10,8 +10,7 @@
 #include "EngineConfig.hpp"
 
 #define JOB(name) NovaEngine::JobSystem::Job name(NovaEngine::JobSystem::Counter* __COROUTINE_COUNTER__, NovaEngine::JobSystem::JobScheduler* scheduler, NovaEngine::Engine* engine, void* arg)
-#define STATIC_JOB(class, name) NovaEngine::JobSystem::Job class::name(NovaEngine::JobSystem::Counter* __COROUTINE_COUNTER__, NovaEngine::JobSystem::JobScheduler* scheduler, NovaEngine::Engine* engine, void* arg)
-#define awaitCounter(counter) co_yield { counter, false }
+#define JOB_AWAIT(counter) if(counter != nullptr) co_yield { counter, false };
 #define JOB_RETURN co_yield { __COROUTINE_COUNTER__, true }
 
 namespace NovaEngine::JobSystem
